@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>ChatGPT Chat Manager</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        width: 95%;
+        max-width: 1200px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        transition: width 0.3s ease;
+      }
+      h1 {
+        color: #10a37f;
+        margin-top: 0;
+      }
+      textarea {
+        width: 100%;
+        height: 150px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: monospace;
+        margin-bottom: 15px;
+      }
+      button {
+        background-color: #10a37f;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #0d8a6c;
+      }
+      .next-button {
+        background-color: #4a6cf7;
+        min-width: 100px;
+      }
+      .next-button:hover {
+        background-color: #3a5ce7;
+      }
+      .status {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 4px;
+        position: relative;
+        z-index: 10;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+        font-weight: bold;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .instructions {
+        background-color: #e9f5fb;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+      .loading {
+        display: inline-block;
+        margin-left: 10px;
+        vertical-align: middle;
+      }
+      .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #10a37f;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* Conversations list screen styles */
+      #conversationsScreen {
+        display: none;
+      }
+      .screen {
+        width: 100%;
+      }
+      .back-button {
+        background-color: #6c757d;
+        margin-bottom: 15px;
+      }
+      .back-button:hover {
+        background-color: #5a6268;
+      }
+      .conversation-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .conversation-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .conversation-item:hover {
+        background-color: #f8f9fa;
+      }
+      .conversation-info {
+        flex: 1;
+      }
+      .conversation-category {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        color: white;
+        margin-left: 10px;
+        white-space: nowrap;
+      }
+      .conversation-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .conversation-date {
+        font-size: 12px;
+        color: #6c757d;
+      }
+      .category-header {
+        font-size: 18px;
+        font-weight: bold;
+        padding: 15px;
+        background-color: #f0f9ff;
+        border-bottom: 1px solid #b6d4fe;
+        color: #0a58ca;
+        margin-top: 10px;
+      }
+      
+      /* Category colors */
+      .category-technology { background-color: #3b82f6; }
+      .category-finance { background-color: #10b981; }
+      .category-gaming { background-color: #8b5cf6; }
+      .category-food { background-color: #f59e0b; }
+      .category-lifestyle { background-color: #ec4899; }
+      .category-home { background-color: #6366f1; }
+      .category-automotive { background-color: #ef4444; }
+      .category-legal { background-color: #64748b; }
+      .category-meeting { background-color: #0ea5e9; }
+      .category-education { background-color: #14b8a6; }
+      .category-health { background-color: #22c55e; }
+      .category-travel { background-color: #a855f7; }
+      .category-business { background-color: #0284c7; }
+      .category-arts { background-color: #f43f5e; }
+      .category-sports { background-color: #84cc16; }
+      .category-news { background-color: #ea580c; }
+      .category-other { background-color: #6b7280; }
+      
+      /* Stats panel styles */
+      .stats-panel {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      .stats-panel h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #495057;
+        font-size: 18px;
+      }
+      .stats-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .stats-content div {
+        padding: 8px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      .recent-conversations h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      .recent-conversations-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-height: 180px;
+        overflow-y: auto;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      .recent-conversations-list li {
+        padding: 12px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .recent-conversations-list li:last-child {
+        border-bottom: none;
+      }
+      .recent-conversation-title {
+        font-weight: bold;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 4px;
+      }
+      .recent-conversation-date {
+        font-size: 12px;
+        color: #6c757d;
+      }
+      .pagination {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+      }
+      
+      /* Toolbar styles */
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+      
+      /* Action button styles */
+      .action-button {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .action-button:hover {
+        background-color: #2563eb;
+      }
+      
+      /* Modal styles */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .modal-content {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        position: relative;
+      }
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+        cursor: pointer;
+        color: #666;
+      }
+      .form-group {
+        margin: 15px 0;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+        gap: 10px;
+      }
+      .cancel-button {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .cancel-button:hover {
+        background-color: #5a6268;
+      }
+      .error-message {
+        color: #dc2626;
+        margin-top: 5px;
+        font-size: 14px;
+      }
+      
+      /* Fade-out animation */
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+      
+      .fade-out {
+        animation: fadeOut 0.5s ease-out forwards;
+      }
+      
+      /* Filter styles */
+      .filter-notice {
+        margin-bottom: 15px;
+      }
+      
+      .category-filter-button {
+        font-size: 12px;
+        padding: 4px 8px;
+        background-color: #e2e8f0;
+        color: #1e40af;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      
+      .category-filter-button:hover {
+        background-color: #cbd5e1;
+      }
+      
+      /* Progress bar styles */
+      .progress-container {
+        width: 100%;
+        height: 20px;
+        background-color: #f3f3f3;
+        border-radius: 5px;
+        position: relative;
+        margin: 10px 0 20px;
+      }
+      .progress-bar {
+        height: 100%;
+        background-color: #4caf50;
+        border-radius: 5px;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+      .progress-text {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Login Screen -->
+      <div id="loginScreen" class="screen">
+        <h1>ChatGPT Chat Manager</h1>
+        
+        <div class="instructions">
+          <h3>How to connect:</h3>
+          <ol>
+            <li>In your browser, open <a href="https://chatgpt.com/" target="_blank">https://chatgpt.com/</a> and log in</li>
+            <li>Open Developer Tools (F12 or right-click → Inspect)</li>
+            <li>Go to the Network tab in Developer Tools</li>
+            <li>Refresh the page to see network requests</li>
+            <li>Find a request named <code>me</code> or one with URL ending in <code>/backend-api/me</code></li>
+            <li>Right-click on this request and select "Copy as cURL"</li>
+            <li>Paste the copied cURL command in the box below</li>
+          </ol>
+        </div>
+        
+        <textarea id="curlInput" placeholder="Paste your cURL command here..."></textarea>
+        <button id="submitButton">Connect to ChatGPT</button>
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div> Connecting...
+        </div>
+        
+        <div id="statusSuccess" class="status success hidden"></div>
+        <div id="statusError" class="status error hidden"></div>
+        <div id="validationError" style="color: #dc3545; margin-top: 15px; font-weight: bold; padding: 10px; background-color: #fff; border: 1px solid #dc3545; border-radius: 4px;" class="hidden"></div>
+        
+        <div id="nextButtonContainer" class="hidden" style="text-align: right; margin-top: 20px;">
+          <button id="nextButton" class="next-button">Next &rarr;</button>
+        </div>
+      </div>
+      
+      <!-- Conversations Screen -->
+      <div id="conversationsScreen" class="screen">
+        <h1>Your ChatGPT Conversations</h1>
+        
+        <div class="toolbar">
+          <div style="display: flex; gap: 10px;">
+            <button id="backButton" class="back-button">&larr; Back</button>
+            <button id="viewAllCategoriesToolbarButton" class="action-button" style="display: none;">View All Categories</button>
+          </div>
+        </div>
+        
+        <div id="conversationsLoading" class="loading hidden">
+          <div class="spinner"></div> <span id="loadingText">Loading conversations...</span>
+        </div>
+        
+        <div id="progressContainer" class="progress-container hidden">
+          <div id="progressBar" class="progress-bar"></div>
+          <div id="progressText" class="progress-text">0%</div>
+        </div>
+        
+        <div id="statsPanel" class="stats-panel hidden">
+          <h3>Conversation Statistics</h3>
+          <div id="statsContent" class="stats-content">
+            <div><strong>Total Conversations:</strong> <span id="statsTotalCount">0</span></div>
+            <div><strong>First Conversation:</strong> <span id="statsFirstDate">-</span></div>
+            <div><strong>Latest Conversation:</strong> <span id="statsLatestDate">-</span></div>
+          </div>
+          <div id="recentConversations" class="recent-conversations">
+            <h4>Most Recent Conversations</h4>
+            <ul id="recentConversationsList" class="recent-conversations-list">
+              <!-- Recent conversations will be listed here -->
+            </ul>
+          </div>
+          <div class="stats-actions" style="margin-top: 15px; text-align: center;">
+            <button id="categorizeButton" class="action-button">Categorize Conversations Using AI</button>
+          </div>
+        </div>
+        
+        <div id="conversationsError" class="status error hidden"></div>
+        
+        <ul id="conversationsList" class="conversation-list">
+          <!-- Conversations will be added here dynamically -->
+        </ul>
+        
+        <div class="pagination hidden">
+          <button id="prevButton" class="back-button" disabled>&larr; Previous</button>
+          <span id="paginationInfo">Showing 1-20 of 0</span>
+          <button id="nextPageButton" class="next-button" disabled>Next &rarr;</button>
+        </div>
+      </div>
+      
+      <!-- OpenAI API Key Modal -->
+      <div id="apiKeyModal" class="modal hidden">
+        <div class="modal-content">
+          <span class="close-button">&times;</span>
+          <h2>Enter OpenAI API Key</h2>
+          <p>To categorize your conversations, we need your OpenAI API key. This will be stored locally on your device.</p>
+          <div class="form-group">
+            <label for="apiKeyInput">API Key (starts with sk-...):</label>
+            <input type="password" id="apiKeyInput" placeholder="sk-...">
+          </div>
+          <div id="apiKeyError" class="error-message hidden"></div>
+          <div class="modal-actions">
+            <button id="cancelApiKeyButton" class="cancel-button">Cancel</button>
+            <button id="saveApiKeyButton" class="action-button">Save Key</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
