@@ -211,6 +211,15 @@ function updateViewControlButtons(state) {
     return;
   }
   
+  // Check if conversations have been categorized (allCategorizedResults exists and has items)
+  const hasCategorizedData = window.allCategorizedResults && window.allCategorizedResults.length > 0;
+  
+  // Hide the container completely if no categorized data exists
+  if (!hasCategorizedData) {
+    viewControlsContainer.style.display = 'none';
+    return;
+  }
+  
   // Otherwise show the container
   viewControlsContainer.style.display = 'block';
   

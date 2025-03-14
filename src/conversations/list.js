@@ -154,6 +154,11 @@ function initList(state) {
 
       // If conversation has a category, add it (this will be present after categorization)
       if (conversation.category) {
+        const categoryContainer = document.createElement('div');
+        categoryContainer.classList.add('category-container');
+        categoryContainer.style.position = 'relative';
+        categoryContainer.style.display = 'inline-block';
+        
         const categoryElement = document.createElement('div');
         categoryElement.classList.add('conversation-category');
 
@@ -209,24 +214,218 @@ function initList(state) {
         // Set category text
         categoryElement.textContent = conversation.category;
 
+        // Add dropdown icon that appears on hover
+        const dropdownIcon = document.createElement('span');
+        dropdownIcon.classList.add('category-dropdown-icon');
+        dropdownIcon.innerHTML = '▼';
+        dropdownIcon.style.marginLeft = '5px';
+        dropdownIcon.style.opacity = '0';
+        dropdownIcon.style.transition = 'opacity 0.2s ease';
+        categoryElement.appendChild(dropdownIcon);
+
         // Make category clickable for filtering
         categoryElement.style.cursor = 'pointer';
-        categoryElement.title = `Click to filter by ${conversation.category}`;
+        categoryElement.title = `Click to filter by ${conversation.category} or use dropdown to change category`;
 
-        // Add click event to filter by this category
-        categoryElement.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent triggering the conversation click event
-          state.currentCategoryFilter = conversation.category;
-          state.currentOffset = 0; // Reset to first page when filtering
-          
-          // Update view controls visibility
-          updateViewControlButtons(state);
-          
-          window.loadConversations(0, state.pageSize); // Load first page with filter
+        // Show dropdown icon on hover
+        categoryElement.addEventListener('mouseenter', () => {
+          dropdownIcon.style.opacity = '1';
         });
 
-        // Add category element to item
-        item.appendChild(categoryElement);
+        categoryElement.addEventListener('mouseleave', () => {
+          if (!dropdownMenuVisible) {
+            dropdownIcon.style.opacity = '0';
+          }
+        });
+
+        // Create dropdown menu (initially hidden)
+        const dropdownMenu = document.createElement('div');
+        dropdownMenu.classList.add('category-dropdown-menu');
+        dropdownMenu.style.position = 'absolute';
+        dropdownMenu.style.zIndex = '100';
+        dropdownMenu.style.backgroundColor = 'white';
+        dropdownMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+        dropdownMenu.style.borderRadius = '4px';
+        dropdownMenu.style.padding = '5px 0';
+        dropdownMenu.style.minWidth = '200px';
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.style.right = '0';
+        dropdownMenu.style.top = '30px';
+        
+        let dropdownMenuVisible = false;
+
+        // Function to toggle dropdown visibility
+        const toggleDropdown = (e) => {
+          e.stopPropagation(); // Prevent event bubbling
+          
+          if (dropdownMenuVisible) {
+            dropdownMenu.style.display = 'none';
+            dropdownMenuVisible = false;
+          } else {
+            // Populate dropdown with all available categories
+            dropdownMenu.innerHTML = '';
+            
+            // Get all unique categories from cachedConversations
+            const allCategories = [...new Set(
+              state.cachedConversations
+                .filter(conv => conv.category)
+                .map(conv => conv.category)
+            )];
+            
+            // Filter out current category
+            const otherCategories = allCategories.filter(cat => cat !== conversation.category);
+            
+            // Create items for each other category
+            otherCategories.forEach(category => {
+              const categoryItem = document.createElement('div');
+              categoryItem.classList.add('category-dropdown-item');
+              categoryItem.textContent = category;
+              categoryItem.style.padding = '6px 12px';
+              categoryItem.style.cursor = 'pointer';
+              categoryItem.style.transition = 'background-color 0.2s';
+              categoryItem.style.fontSize = '11px';
+              categoryItem.style.overflow = 'hidden';
+              categoryItem.style.textOverflow = 'ellipsis';
+              
+              // Hover effect
+              categoryItem.addEventListener('mouseenter', () => {
+                categoryItem.style.backgroundColor = '#f0f9ff';
+              });
+              
+              categoryItem.addEventListener('mouseleave', () => {
+                categoryItem.style.backgroundColor = 'transparent';
+              });
+              
+              // Click handler for category change
+              categoryItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Change the conversation's category
+                conversation.category = category;
+                
+                // Update UI
+                categoryElement.textContent = category;
+                categoryElement.appendChild(dropdownIcon);
+                
+                // Update CSS class for color
+                categoryElement.className = 'conversation-category';
+                const newSimplifiedCategory = category.split('&')[0].trim().toLowerCase();
+                let newMappedCategory;
+                
+                // Map the category (same mapping logic as before)
+                if (newSimplifiedCategory.includes('technology') || newSimplifiedCategory.includes('software')) {
+                  newMappedCategory = 'technology';
+                } else if (newSimplifiedCategory.includes('finance')) {
+                  newMappedCategory = 'finance';
+                } else if (newSimplifiedCategory.includes('gaming')) {
+                  newMappedCategory = 'gaming';
+                } else if (newSimplifiedCategory.includes('food')) {
+                  newMappedCategory = 'food';
+                } else if (newSimplifiedCategory.includes('lifestyle')) {
+                  newMappedCategory = 'lifestyle';
+                } else if (newSimplifiedCategory.includes('home')) {
+                  newMappedCategory = 'home';
+                } else if (newSimplifiedCategory.includes('automotive')) {
+                  newMappedCategory = 'automotive';
+                } else if (newSimplifiedCategory.includes('legal')) {
+                  newMappedCategory = 'legal';
+                } else if (newSimplifiedCategory.includes('meeting')) {
+                  newMappedCategory = 'meeting';
+                } else if (newSimplifiedCategory.includes('education')) {
+                  newMappedCategory = 'education';
+                } else if (newSimplifiedCategory.includes('health')) {
+                  newMappedCategory = 'health';
+                } else if (newSimplifiedCategory.includes('travel')) {
+                  newMappedCategory = 'travel';
+                } else if (newSimplifiedCategory.includes('business')) {
+                  newMappedCategory = 'business';
+                } else if (newSimplifiedCategory.includes('arts') || newSimplifiedCategory.includes('culture')) {
+                  newMappedCategory = 'arts';
+                } else if (newSimplifiedCategory.includes('sports')) {
+                  newMappedCategory = 'sports';
+                } else if (newSimplifiedCategory.includes('news')) {
+                  newMappedCategory = 'news';
+                } else {
+                  newMappedCategory = 'other';
+                }
+                
+                const newCategoryClass = 'category-' + newMappedCategory;
+                categoryElement.classList.add(newCategoryClass);
+                
+                // Hide dropdown
+                dropdownMenu.style.display = 'none';
+                dropdownMenuVisible = false;
+                
+                // If in filtered view and category changed, remove from list
+                if (state.currentCategoryFilter && state.currentCategoryFilter !== category) {
+                  item.style.animation = 'fadeOut 0.5s ease-out forwards';
+                  setTimeout(() => {
+                    item.remove();
+                    
+                    // If no conversations left, show empty message
+                    const remainingItems = document.querySelectorAll('.conversation-item');
+                    if (remainingItems.length === 0) {
+                      const emptyItem = document.createElement('li');
+                      emptyItem.classList.add('conversation-item');
+                      emptyItem.textContent = `No conversations found in category "${state.currentCategoryFilter}"`;
+                      document.getElementById('conversationsList').appendChild(emptyItem);
+                    }
+                  }, 500);
+                }
+              });
+              
+              dropdownMenu.appendChild(categoryItem);
+            });
+            
+            if (otherCategories.length === 0) {
+              const noCategories = document.createElement('div');
+              noCategories.style.padding = '6px 12px';
+              noCategories.style.color = '#6c757d';
+              noCategories.style.fontSize = '11px';
+              noCategories.textContent = 'No other categories available';
+              dropdownMenu.appendChild(noCategories);
+            }
+            
+            dropdownMenu.style.display = 'block';
+            dropdownMenuVisible = true;
+          }
+        };
+
+        // Add click event for category filtering (when clicking on the category itself)
+        categoryElement.addEventListener('click', (e) => {
+          // Check if the click was on the dropdown icon
+          if (e.target === dropdownIcon) {
+            toggleDropdown(e);
+          } else {
+            e.stopPropagation(); // Prevent triggering the conversation click event
+            state.currentCategoryFilter = conversation.category;
+            state.currentOffset = 0; // Reset to first page when filtering
+            
+            // Update view controls visibility
+            updateViewControlButtons(state);
+            
+            window.loadConversations(0, state.pageSize); // Load first page with filter
+          }
+        });
+
+        // Add event listener for dropdown icon
+        dropdownIcon.addEventListener('click', toggleDropdown);
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          if (dropdownMenuVisible) {
+            dropdownMenu.style.display = 'none';
+            dropdownMenuVisible = false;
+            dropdownIcon.style.opacity = '0';
+          }
+        });
+
+        // Add elements to container
+        categoryContainer.appendChild(categoryElement);
+        categoryContainer.appendChild(dropdownMenu);
+        
+        // Add category container to item
+        item.appendChild(categoryContainer);
 
         // Add click event to view conversation details (will implement later)
         item.addEventListener('click', () => {

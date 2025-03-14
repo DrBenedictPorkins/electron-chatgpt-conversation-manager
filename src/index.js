@@ -35,6 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initStats(state);
   initProgress();
   
+  // Ensure view controls are hidden on initial load
+  const viewControls = document.getElementById('viewControls');
+  if (viewControls) {
+    viewControls.style.display = 'none';
+  }
+  
   // Add window resize listener for responsive container
   window.addEventListener('resize', function() {
     const container = document.querySelector('.container');

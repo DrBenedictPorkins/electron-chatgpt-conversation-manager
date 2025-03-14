@@ -23,9 +23,12 @@ function initPagination(state) {
     }
     paginationInfo.textContent = paginationText;
     
-    // Show/hide pagination controls based on whether we have results
+    // Show/hide pagination controls based on whether we have results and if categorization has happened
     const paginationContainer = document.querySelector('.pagination');
-    if (total > 0) {
+    const hasCategorizedData = window.allCategorizedResults && window.allCategorizedResults.length > 0;
+    
+    // Show pagination only if we have results AND either categorization has happened or we're in the initial view
+    if (total > 0 && (hasCategorizedData || !state.groupByCategory)) {
       paginationContainer.classList.remove('hidden');
     } else {
       paginationContainer.classList.add('hidden');

@@ -114,6 +114,10 @@ function initCategorization(state) {
         // Display the categorized results
         window.displayCategorizedConversations(result.categories, 0, state.pageSize);
         
+        // Show view controls now that we have categorized data
+        const { updateViewControlButtons } = require('../utils/api-client');
+        updateViewControlButtons(state);
+        
         // Load the first page of conversations to display with the updated cachedConversations
         // that now include category information
         await window.loadConversations();
@@ -136,7 +140,8 @@ function initCategorization(state) {
     
     // Show the conversation list
     conversationsList.classList.remove('hidden');
-    document.querySelector('.pagination').classList.remove('hidden');
+    
+    // Pagination will be controlled by updatePagination function based on categorization status
     
     // First, group by category
     const categoriesMap = {};
@@ -290,6 +295,12 @@ function initCategorization(state) {
         // Add info container to the item
         item.appendChild(infoContainer);
         
+        // Create category container
+        const categoryContainer = document.createElement('div');
+        categoryContainer.classList.add('category-container');
+        categoryContainer.style.position = 'relative';
+        categoryContainer.style.display = 'inline-block';
+        
         // Create and add category label
         const categoryElement = document.createElement('div');
         categoryElement.classList.add('conversation-category');
@@ -345,6 +356,15 @@ function initCategorization(state) {
         // Set category text
         categoryElement.textContent = category;
         
+        // Add dropdown icon that appears on hover
+        const dropdownIcon = document.createElement('span');
+        dropdownIcon.classList.add('category-dropdown-icon');
+        dropdownIcon.innerHTML = '▼';
+        dropdownIcon.style.marginLeft = '5px';
+        dropdownIcon.style.opacity = '0';
+        dropdownIcon.style.transition = 'opacity 0.2s ease';
+        categoryElement.appendChild(dropdownIcon);
+        
         // Special handling for Meeting Summaries - ensure visibility
         if (category.includes('Meeting')) {
           console.log('Special handling for Meeting category in categorization view:', title);
@@ -355,8 +375,205 @@ function initCategorization(state) {
           categoryElement.style.opacity = '1';
         }
         
-        // Add category element to item
-        item.appendChild(categoryElement);
+        // Show dropdown icon on hover
+        categoryElement.addEventListener('mouseenter', () => {
+          dropdownIcon.style.opacity = '1';
+        });
+        
+        categoryElement.addEventListener('mouseleave', () => {
+          if (!dropdownMenuVisible) {
+            dropdownIcon.style.opacity = '0';
+          }
+        });
+        
+        // Create dropdown menu (initially hidden)
+        const dropdownMenu = document.createElement('div');
+        dropdownMenu.classList.add('category-dropdown-menu');
+        dropdownMenu.style.position = 'absolute';
+        dropdownMenu.style.zIndex = '100';
+        dropdownMenu.style.backgroundColor = 'white';
+        dropdownMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+        dropdownMenu.style.borderRadius = '4px';
+        dropdownMenu.style.padding = '5px 0';
+        dropdownMenu.style.minWidth = '200px';
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.style.right = '0';
+        dropdownMenu.style.top = '30px';
+        
+        let dropdownMenuVisible = false;
+        
+        // Function to toggle dropdown visibility
+        const toggleDropdown = (e) => {
+          e.stopPropagation(); // Prevent event bubbling
+          
+          if (dropdownMenuVisible) {
+            dropdownMenu.style.display = 'none';
+            dropdownMenuVisible = false;
+          } else {
+            // Populate dropdown with all available categories
+            dropdownMenu.innerHTML = '';
+            
+            // Find the original conversation in cachedConversations to update
+            const originalConversation = window.allConversationsData ? 
+              window.allConversationsData.find(conv => (conv.title || 'Untitled conversation') === title) : null;
+            
+            if (!originalConversation) {
+              console.error('Could not find conversation to update category for:', title);
+              return;
+            }
+            
+            // Get all unique categories from categorizedItems
+            const allCategories = [...new Set(
+              window.allCategorizedResults
+                .map(item => item.category)
+            )];
+            
+            // Filter out current category
+            const otherCategories = allCategories.filter(cat => cat !== category);
+            
+            // Create items for each other category
+            otherCategories.forEach(otherCategory => {
+              const categoryItem = document.createElement('div');
+              categoryItem.classList.add('category-dropdown-item');
+              categoryItem.textContent = otherCategory;
+              categoryItem.style.padding = '6px 12px';
+              categoryItem.style.cursor = 'pointer';
+              categoryItem.style.transition = 'background-color 0.2s';
+              categoryItem.style.fontSize = '11px';
+              categoryItem.style.overflow = 'hidden';
+              categoryItem.style.textOverflow = 'ellipsis';
+              
+              // Hover effect
+              categoryItem.addEventListener('mouseenter', () => {
+                categoryItem.style.backgroundColor = '#f0f9ff';
+              });
+              
+              categoryItem.addEventListener('mouseleave', () => {
+                categoryItem.style.backgroundColor = 'transparent';
+              });
+              
+              // Click handler for category change
+              categoryItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Find the categorized item in allCategorizedResults to update
+                const categorizedItem = window.allCategorizedResults.find(item => item.title === title);
+                if (categorizedItem) {
+                  categorizedItem.category = otherCategory;
+                }
+                
+                // Update the original conversation in cachedConversations
+                if (originalConversation) {
+                  originalConversation.category = otherCategory;
+                }
+                
+                // Update UI
+                categoryElement.textContent = otherCategory;
+                categoryElement.appendChild(dropdownIcon);
+                
+                // Update CSS class for color
+                categoryElement.className = 'conversation-category';
+                const newSimplifiedCategory = otherCategory.split('&')[0].trim().toLowerCase();
+                let newMappedCategory;
+                
+                // Map the category (same mapping logic as before)
+                if (newSimplifiedCategory.includes('technology') || newSimplifiedCategory.includes('software')) {
+                  newMappedCategory = 'technology';
+                } else if (newSimplifiedCategory.includes('finance')) {
+                  newMappedCategory = 'finance';
+                } else if (newSimplifiedCategory.includes('gaming')) {
+                  newMappedCategory = 'gaming';
+                } else if (newSimplifiedCategory.includes('food')) {
+                  newMappedCategory = 'food';
+                } else if (newSimplifiedCategory.includes('lifestyle')) {
+                  newMappedCategory = 'lifestyle';
+                } else if (newSimplifiedCategory.includes('home')) {
+                  newMappedCategory = 'home';
+                } else if (newSimplifiedCategory.includes('automotive')) {
+                  newMappedCategory = 'automotive';
+                } else if (newSimplifiedCategory.includes('legal')) {
+                  newMappedCategory = 'legal';
+                } else if (newSimplifiedCategory.includes('meeting')) {
+                  newMappedCategory = 'meeting';
+                } else if (newSimplifiedCategory.includes('education')) {
+                  newMappedCategory = 'education';
+                } else if (newSimplifiedCategory.includes('health')) {
+                  newMappedCategory = 'health';
+                } else if (newSimplifiedCategory.includes('travel')) {
+                  newMappedCategory = 'travel';
+                } else if (newSimplifiedCategory.includes('business')) {
+                  newMappedCategory = 'business';
+                } else if (newSimplifiedCategory.includes('arts') || newSimplifiedCategory.includes('culture')) {
+                  newMappedCategory = 'arts';
+                } else if (newSimplifiedCategory.includes('sports')) {
+                  newMappedCategory = 'sports';
+                } else if (newSimplifiedCategory.includes('news')) {
+                  newMappedCategory = 'news';
+                } else {
+                  newMappedCategory = 'other';
+                }
+                
+                const newCategoryClass = 'category-' + newMappedCategory;
+                categoryElement.classList.add(newCategoryClass);
+                
+                // Hide dropdown
+                dropdownMenu.style.display = 'none';
+                dropdownMenuVisible = false;
+                
+                // If in grouped view, remove from current category group and refresh the view
+                if (state.groupByCategory) {
+                  // Animate fade out
+                  item.style.animation = 'fadeOut 0.5s ease-out forwards';
+                  setTimeout(() => {
+                    // After animation completes, refresh the categorized view
+                    window.displayCategorizedConversations(window.allCategorizedResults, 0, state.pageSize);
+                  }, 500);
+                }
+              });
+              
+              dropdownMenu.appendChild(categoryItem);
+            });
+            
+            if (otherCategories.length === 0) {
+              const noCategories = document.createElement('div');
+              noCategories.style.padding = '6px 12px';
+              noCategories.style.color = '#6c757d';
+              noCategories.style.fontSize = '11px';
+              noCategories.textContent = 'No other categories available';
+              dropdownMenu.appendChild(noCategories);
+            }
+            
+            dropdownMenu.style.display = 'block';
+            dropdownMenuVisible = true;
+          }
+        };
+        
+        // Add click event listeners
+        categoryElement.addEventListener('click', (e) => {
+          // Check if the click was on the dropdown icon
+          if (e.target === dropdownIcon) {
+            toggleDropdown(e);
+          }
+        });
+        
+        // Add event listener for dropdown icon
+        dropdownIcon.addEventListener('click', toggleDropdown);
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          if (dropdownMenuVisible) {
+            dropdownMenu.style.display = 'none';
+            dropdownMenuVisible = false;
+            dropdownIcon.style.opacity = '0';
+          }
+        });
+        
+        // Add elements to container
+        categoryContainer.appendChild(categoryElement);
+        categoryContainer.appendChild(dropdownMenu);
+        
+        // Add category container to item
+        item.appendChild(categoryContainer);
         
         // For Meeting Summaries entries, force refresh the DOM
         if (category.includes('Meeting')) {
