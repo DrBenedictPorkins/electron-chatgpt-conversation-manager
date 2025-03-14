@@ -7,11 +7,21 @@ const { ipcRenderer } = require('electron');
  */
 function initApiKey(state) {
   const apiKeyModal = document.getElementById('apiKeyModal');
-  const closeModalButton = document.querySelector('.close-button');
+  const promptModal = document.getElementById('promptModal');
+  const closeModalButton = document.querySelector('#apiKeyModal .close-button');
+  const closePromptButton = document.getElementById('closePromptButton');
   const apiKeyInput = document.getElementById('apiKeyInput');
+  const promptInput = document.getElementById('promptInput');
   const apiKeyError = document.getElementById('apiKeyError');
+  const promptError = document.getElementById('promptError');
   const cancelApiKeyButton = document.getElementById('cancelApiKeyButton');
+  const cancelPromptButton = document.getElementById('cancelPromptButton');
   const saveApiKeyButton = document.getElementById('saveApiKeyButton');
+  const savePromptButton = document.getElementById('savePromptButton');
+  const resetPromptButton = document.getElementById('resetPromptButton');
+  const savePromptCheckbox = document.getElementById('savePromptCheckbox');
+  
+  let defaultPrompt = '';
   
   // Function to show API key modal
   window.showApiKeyModal = function() {
@@ -36,10 +46,50 @@ function initApiKey(state) {
     apiKeyModal.classList.add('hidden');
   };
   
+  // Function to show prompt customization modal
+  window.showPromptModal = async function() {
+    promptModal.classList.remove('hidden');
+    promptError.classList.add('hidden');
+    
+    // Load default prompt if we haven't already
+    if (!defaultPrompt) {
+      try {
+        const result = await ipcRenderer.invoke('get-default-prompt');
+        defaultPrompt = result.defaultPrompt;
+      } catch (error) {
+        console.error('Error getting default prompt:', error);
+      }
+    }
+    
+    // Check if we already have a custom prompt
+    try {
+      const result = await ipcRenderer.invoke('get-custom-prompt');
+      if (result.customPrompt) {
+        promptInput.value = result.customPrompt;
+      } else {
+        promptInput.value = defaultPrompt;
+      }
+    } catch (error) {
+      console.error('Error getting custom prompt:', error);
+      promptInput.value = defaultPrompt;
+    }
+  };
+  
+  // Function to hide prompt customization modal
+  window.hidePromptModal = function() {
+    promptModal.classList.add('hidden');
+  };
+  
   // Close modal when clicking outside the content
   apiKeyModal.addEventListener('click', (event) => {
     if (event.target === apiKeyModal) {
       window.hideApiKeyModal();
+    }
+  });
+  
+  promptModal.addEventListener('click', (event) => {
+    if (event.target === promptModal) {
+      window.hidePromptModal();
     }
   });
   
@@ -50,14 +100,32 @@ function initApiKey(state) {
     }
   });
   
-  // Handle close modal button click
+  // Handle close modal button clicks
   closeModalButton.addEventListener('click', () => {
     window.hideApiKeyModal();
   });
   
-  // Handle cancel button click
+  closePromptButton.addEventListener('click', () => {
+    window.hidePromptModal();
+  });
+  
+  // Handle cancel button clicks
   cancelApiKeyButton.addEventListener('click', () => {
     window.hideApiKeyModal();
+  });
+  
+  cancelPromptButton.addEventListener('click', () => {
+    window.hidePromptModal();
+  });
+  
+  // Handle reset prompt button click
+  resetPromptButton.addEventListener('click', async () => {
+    try {
+      const result = await ipcRenderer.invoke('get-default-prompt');
+      promptInput.value = result.defaultPrompt;
+    } catch (error) {
+      console.error('Error getting default prompt:', error);
+    }
   });
   
   // Handle save API key button click
@@ -72,6 +140,42 @@ function initApiKey(state) {
       
       if (result.success) {
         window.hideApiKeyModal();
+        
+        // Show prompt customization modal
+        window.showPromptModal();
+      } else {
+        apiKeyError.textContent = result.error;
+        apiKeyError.classList.remove('hidden');
+      }
+    } catch (error) {
+      apiKeyError.textContent = `Error: ${error.message}`;
+      apiKeyError.classList.remove('hidden');
+    }
+  });
+  
+  // Handle save prompt button click
+  savePromptButton.addEventListener('click', async () => {
+    const customPrompt = promptInput.value.trim();
+    const savePrompt = savePromptCheckbox.checked;
+    
+    // Clear previous error
+    promptError.classList.add('hidden');
+    
+    // Validate that the prompt contains the titles placeholder
+    if (!customPrompt.includes('{{TITLES}}')) {
+      promptError.textContent = 'The prompt must include {{TITLES}} placeholder where conversation titles will be inserted.';
+      promptError.classList.remove('hidden');
+      return;
+    }
+    
+    try {
+      const result = await ipcRenderer.invoke('save-custom-prompt', { 
+        customPrompt, 
+        save: savePrompt 
+      });
+      
+      if (result.success) {
+        window.hidePromptModal();
         
         // Show loading indicator
         const conversationsLoading = document.getElementById('conversationsLoading');
@@ -88,7 +192,6 @@ function initApiKey(state) {
         // Show conversation list and pagination after categorization
         const conversationsList = document.getElementById('conversationsList');
         conversationsList.classList.remove('hidden');
-        document.querySelector('.pagination').classList.remove('hidden');
         
         // Hide the categorize button and its container
         const categorizeButton = document.getElementById('categorizeButton');
@@ -97,12 +200,12 @@ function initApiKey(state) {
           categorizeContainer.style.display = 'none';
         }
       } else {
-        apiKeyError.textContent = result.error;
-        apiKeyError.classList.remove('hidden');
+        promptError.textContent = result.error;
+        promptError.classList.remove('hidden');
       }
     } catch (error) {
-      apiKeyError.textContent = `Error: ${error.message}`;
-      apiKeyError.classList.remove('hidden');
+      promptError.textContent = `Error: ${error.message}`;
+      promptError.classList.remove('hidden');
     }
   });
 }

@@ -13,7 +13,8 @@ let totalConversations = 0;
 
 // App configuration
 let appConfig = {
-  openaiApiKey: null
+  openaiApiKey: null,
+  customPrompt: null
 };
 
 // Config file path
@@ -349,6 +350,82 @@ ipcMain.handle('save-openai-key', async (event, { apiKey }) => {
   }
 });
 
+// Handle get custom prompt request
+ipcMain.handle('get-custom-prompt', async (event) => {
+  return {
+    customPrompt: appConfig.customPrompt || null
+  };
+});
+
+// Handle save custom prompt request
+ipcMain.handle('save-custom-prompt', async (event, { customPrompt, save }) => {
+  try {
+    if (save) {
+      // Save the custom prompt to config
+      appConfig.customPrompt = customPrompt;
+      saveConfig();
+    } else {
+      // Use the prompt temporarily without saving to config
+      appConfig.customPrompt = customPrompt;
+    }
+    
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error saving custom prompt:', error);
+    return {
+      success: false,
+      error: `Failed to save custom prompt: ${error.message}`
+    };
+  }
+});
+
+// Handle get default prompt request
+ipcMain.handle('get-default-prompt', async (event) => {
+  const defaultPrompt = `
+  I have a list of conversation titles, and I need you to categorize each title into one of the following categories. If a title doesn't clearly fit into any of these categories, please place it under 'Other.' If a title might belong to multiple categories, choose the category that best represents its main subject.
+
+  Categories:
+  - Technology & Software Development
+  - Finance & Investments
+  - Gaming & Entertainment
+  - Food & Cooking
+  - Lifestyle
+  - Home Improvement
+  - Automotive
+  - Legal
+  - Meeting Summaries
+  - Education & Learning
+  - Health & Wellness
+  - Travel & Leisure
+  - Business & Management
+  - Arts, Culture & Entertainment
+  - Sports & Recreation
+  - News & Current Affairs
+  - Other (for titles that are ambiguous or don't clearly fit into any of the above)
+
+  Here are the conversation titles:
+  {{TITLES}}
+  
+  Please respond with a JSON array where each element contains:
+  1. "title": The original conversation title
+  2. "category": The category you've assigned (must be exactly one of the categories listed above)
+  
+  Example format: 
+  [
+    {"title": "Create Electron App", "category": "Technology & Software Development"},
+    {"title": "Dinner Ideas with Ground Beef", "category": "Food & Cooking"}
+  ]
+  
+  Only respond with the JSON array, no additional text.
+  `;
+  
+  return {
+    defaultPrompt
+  };
+});
+
 // Handle categorization request
 ipcMain.handle('categorize-conversations', async (event, { titles }) => {
   try {
@@ -367,7 +444,7 @@ ipcMain.handle('categorize-conversations', async (event, { titles }) => {
     }
     
     // Define the prompt for categorization
-    const prompt = `
+    let prompt = `
     I have a list of conversation titles, and I need you to categorize each title into one of the following categories. If a title doesn't clearly fit into any of these categories, please place it under 'Other.' If a title might belong to multiple categories, choose the category that best represents its main subject.
 
     Categories:
@@ -404,6 +481,13 @@ ipcMain.handle('categorize-conversations', async (event, { titles }) => {
     
     Only respond with the JSON array, no additional text.
     `;
+    
+    // Use custom prompt if available
+    if (appConfig.customPrompt) {
+      // Replace the title placeholder with actual titles
+      const titlesFormatted = titles.map((title, index) => `${index + 1}. ${title}`).join('\n');
+      prompt = appConfig.customPrompt.replace('{{TITLES}}', titlesFormatted);
+    }
     
     console.log('Sending categorization request to OpenAI API...');
     

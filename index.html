@@ -515,6 +515,15 @@
         border-radius: 4px;
         font-size: 14px;
       }
+      
+      .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        resize: vertical;
+      }
       .modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -751,6 +760,31 @@
           <div class="modal-actions">
             <button id="cancelApiKeyButton" class="cancel-button">Cancel</button>
             <button id="saveApiKeyButton" class="action-button">Save Key</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Prompt Customization Modal -->
+      <div id="promptModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px; width: 90%; padding: 25px;">
+          <span class="close-button" id="closePromptButton" style="top: 20px; right: 25px;">&times;</span>
+          <h2>Customize Categorization Prompt</h2>
+          <p>This is the prompt that will be sent to the AI to categorize your conversations. You can customize it to fit your needs.</p>
+          <div class="form-group">
+            <label for="promptInput">Prompt:</label>
+            <textarea id="promptInput" style="height: 300px; font-family: monospace; font-size: 13px;"></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+              <input type="checkbox" id="savePromptCheckbox" checked>
+              Save this prompt for future use
+            </label>
+          </div>
+          <div id="promptError" class="error-message hidden"></div>
+          <div class="modal-actions">
+            <button id="resetPromptButton" class="cancel-button">Reset to Default</button>
+            <button id="cancelPromptButton" class="cancel-button">Cancel</button>
+            <button id="savePromptButton" class="action-button">Save & Continue</button>
           </div>
         </div>
       </div>
