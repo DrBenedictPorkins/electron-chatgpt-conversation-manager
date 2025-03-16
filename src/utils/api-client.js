@@ -204,24 +204,53 @@ function updateViewControlButtons(state) {
   const groupButton = document.getElementById('groupByCategoryButton');
   const clearGroupingButton = document.getElementById('clearGroupingButton');
   const viewControlsContainer = document.getElementById('viewControls');
+  const headerViewControls = document.getElementById('headerViewControls');
   
-  // If filtering by a specific category, hide both buttons
+  // If filtering by a specific category, hide the grouping buttons
   if (state.currentCategoryFilter) {
     viewControlsContainer.style.display = 'none';
     return;
   }
   
-  // Check if conversations have been categorized (allCategorizedResults exists and has items)
-  const hasCategorizedData = window.allCategorizedResults && window.allCategorizedResults.length > 0;
+  // Check if the categorization feature is enabled
+  const categorizationEnabled = viewControlsContainer && 
+                              viewControlsContainer.dataset && 
+                              viewControlsContainer.dataset.needsCategorization === "false";
   
-  // Hide the container completely if no categorized data exists
-  if (!hasCategorizedData) {
+  // Check if conversations have been categorized (use both our flags and the actual data check)
+  const hasCategorizedData = window.hasCategorizedData === true && 
+                           window.allCategorizedResults && 
+                           window.allCategorizedResults.length > 0 &&
+                           state.cachedConversations.some(conv => !!conv.category);
+  
+  console.log('Checking categorization status:', {
+    globalFlag: window.hasCategorizedData,
+    categorizationEnabled: categorizationEnabled,
+    hasResults: !!window.allCategorizedResults,
+    resultsLength: window.allCategorizedResults ? window.allCategorizedResults.length : 0,
+    hasCategories: state.cachedConversations && state.cachedConversations.some(conv => !!conv.category)
+  });
+  
+  // Hide the group by category buttons if categorization is needed or no categorized data exists
+  if (!categorizationEnabled || !hasCategorizedData) {
+    console.log('Hiding view controls - categorization not enabled or no data');
     viewControlsContainer.style.display = 'none';
     return;
   }
   
   // Otherwise show the container
+  console.log('Showing view controls - categorization enabled and data available');
   viewControlsContainer.style.display = 'block';
+  
+  // Check if we're in delete/archive mode (disable grouping when selecting items)
+  const hasSelectedItems = (state.selectedForDeletion && state.selectedForDeletion.length > 0) || 
+                        (state.selectedForArchive && state.selectedForArchive.length > 0);
+                        
+  // Hide grouping buttons when selecting items
+  if (hasSelectedItems) {
+    viewControlsContainer.style.display = 'none';
+    return;
+  }
   
   if (state.groupByCategory) {
     // If grouped by category, show Clear Grouping button
@@ -232,11 +261,174 @@ function updateViewControlButtons(state) {
     groupButton.style.display = 'inline-block';
     clearGroupingButton.style.display = 'none';
   }
+  
+  // Update the category dropdown list
+  updateCategoryDropdown(state);
+}
+
+/**
+ * Update the category dropdown with available categories
+ * @param {Object} state - Global application state
+ */
+function updateCategoryDropdown(state) {
+  const dropdownList = document.getElementById('categoryDropdownList');
+  const dropdownMenu = document.getElementById('categoryDropdownMenu');
+  
+  if (!dropdownList || !window.allCategorizedResults) return;
+  
+  // Clear the dropdown
+  dropdownList.innerHTML = '';
+  
+  // Get unique categories
+  const categories = new Set();
+  if (window.allCategorizedResults) {
+    window.allCategorizedResults.forEach(item => {
+      if (item.category) {
+        categories.add(item.category);
+      }
+    });
+  }
+  
+  if (categories.size === 0) {
+    const noCategories = document.createElement('div');
+    noCategories.style.padding = '8px 12px';
+    noCategories.style.color = '#6c757d';
+    noCategories.style.fontStyle = 'italic';
+    noCategories.textContent = 'No categories available';
+    dropdownList.appendChild(noCategories);
+    return;
+  }
+  
+  // Add each category to the dropdown
+  Array.from(categories).sort().forEach(category => {
+    const item = document.createElement('div');
+    item.style.padding = '8px 12px';
+    item.style.cursor = 'pointer';
+    item.style.transition = 'all 0.2s ease';
+    item.style.borderRadius = '4px';
+    item.style.margin = '2px 4px';
+    item.style.fontSize = '14px';
+    item.textContent = category;
+    
+    // Add hover effect
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = '#f0f9ff';
+      item.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+    });
+    
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+      item.style.boxShadow = 'none';
+    });
+    
+    // Add click handler to filter by this category
+    item.addEventListener('click', () => {
+      // Set the filter and reset to first page
+      state.currentCategoryFilter = category;
+      state.currentOffset = 0;
+      
+      // Update view controls visibility
+      updateViewControlButtons(state);
+      
+      // Reload conversations with the filter
+      if (window.loadConversations) {
+        window.loadConversations(0, state.pageSize);
+      }
+      
+      // Hide the dropdown
+      if (dropdownMenu) {
+        dropdownMenu.style.display = 'none';
+      }
+    });
+    
+    dropdownList.appendChild(item);
+  });
+  
+  // Add dropdown menu functionality
+  // Create a separate button for the dropdown
+  const dropdownToggle = document.createElement('span');
+  dropdownToggle.innerHTML = '▼';
+  dropdownToggle.style.marginLeft = '8px';
+  dropdownToggle.style.cursor = 'pointer';
+  dropdownToggle.title = 'Show category options';
+  dropdownToggle.className = 'dropdown-toggle';
+  
+  // Find the group button and add the dropdown toggle if needed
+  const groupByCategoryButton = document.getElementById('groupByCategoryButton');
+  
+  if (groupByCategoryButton && dropdownMenu) {
+    // Add the dropdown toggle to the button if not already there
+    if (!groupByCategoryButton.querySelector('.dropdown-toggle')) {
+      groupByCategoryButton.appendChild(dropdownToggle);
+    }
+    // Add dropdown toggle functionality
+    dropdownToggle.addEventListener('click', (e) => {
+      // Prevent the main button action
+      e.stopPropagation();
+      e.preventDefault();
+      
+      // Toggle the dropdown
+      if (dropdownMenu.style.display === 'block') {
+        dropdownMenu.style.display = 'none';
+      } else {
+        // Position the dropdown correctly
+        dropdownMenu.style.display = 'block';
+        dropdownMenu.style.zIndex = '9999';
+        
+        // Add a brief highlight effect to make it more visible
+        dropdownMenu.style.boxShadow = '0 0 15px rgba(74, 108, 247, 0.5)';
+        setTimeout(() => {
+          if (dropdownMenu.style.display === 'block') {
+            dropdownMenu.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+          }
+        }, 300);
+      }
+      
+      return false;
+    });
+    
+    // When group button is clicked, just perform the grouping action
+    groupByCategoryButton.addEventListener('click', () => {
+      // Call the global grouping function
+      if (window.performGroupByCategory) {
+        window.performGroupByCategory();
+      }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdownMenu.contains(e.target) && e.target !== dropdownToggle) {
+        dropdownMenu.style.display = 'none';
+      }
+    });
+  }
+}
+
+/**
+ * Get the original ChatGPT headers stored from the cURL command
+ * @returns {Promise<Object>} The headers object
+ */
+async function getOriginalHeaders() {
+  try {
+    const result = await ipcRenderer.invoke('get-headers');
+    
+    if (!result.success) {
+      console.error('Failed to get headers:', result.error);
+      return null;
+    }
+    
+    return result.headers;
+  } catch (error) {
+    console.error('Error getting headers:', error);
+    return null;
+  }
 }
 
 module.exports = {
   loadAllConversations,
   fetchConversations,
   filterConversationsByCategory,
-  updateViewControlButtons
+  updateViewControlButtons,
+  updateCategoryDropdown,
+  getOriginalHeaders
 };
