@@ -352,14 +352,27 @@ ipcMain.handle('fetch-conversations', async (event, { offset, limit }) => {
   }
 });
 
-// Handle archiving conversations
-ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
+/**
+ * Common function to process conversations (archive or delete)
+ * @param {Object} event - IPC event object
+ * @param {Object} options - Operation options
+ * @param {Array} options.conversationIds - IDs of conversations to process
+ * @param {string} options.operationType - 'archive' or 'delete'
+ * @returns {Promise<Object>} - Operation result
+ */
+async function processConversations(event, { conversationIds, operationType }) {
   try {
-    console.log('Archive operation starting...');
+    // Set operation-specific variables
+    const isArchive = operationType === 'archive';
+    const opName = isArchive ? 'Archive' : 'Delete';
+    const progressEvent = isArchive ? 'archive-progress' : 'delete-progress';
+    const payload = isArchive ? { is_archived: true } : { is_visible: false };
+    
+    console.log(`${opName} operation starting...`);
     console.log(`Headers available: ${Object.keys(chatGptHeaders || {}).join(', ')}`);
     
     if (!isAuthenticated()) {
-      console.error('Archive operation failed: Not authenticated');
+      console.error(`${opName} operation failed: Not authenticated`);
       return {
         success: false,
         error: 'Not authenticated. Please connect to ChatGPT first.'
@@ -367,17 +380,17 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
     }
     
     if (!conversationIds || !Array.isArray(conversationIds) || conversationIds.length === 0) {
-      console.error('Archive operation failed: No conversation IDs provided');
+      console.error(`${opName} operation failed: No conversation IDs provided`);
       return {
         success: false,
-        error: 'No conversation IDs provided for archiving'
+        error: `No conversation IDs provided for ${operationType === 'archive' ? 'archiving' : 'deletion'}`
       };
     }
     
-    console.log(`Starting archive operation for ${conversationIds.length} conversations`);
-    console.log('Conversation IDs to archive:', conversationIds);
+    console.log(`Starting ${operationType} operation for ${conversationIds.length} conversations`);
+    console.log(`Conversation IDs to ${operationType}:`, conversationIds);
     
-    // Track successfully archived conversations and errors
+    // Track successfully processed conversations and errors
     const results = {
       success: [],
       failed: []
@@ -390,9 +403,9 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
     // Update progress function
     const updateProgress = (completed) => {
       const percentComplete = Math.round((completed / totalConversations) * 100);
-      console.log(`Archive progress: ${completed}/${totalConversations} (${percentComplete}%)`);
+      console.log(`${opName} progress: ${completed}/${totalConversations} (${percentComplete}%)`);
       
-      event.sender.send('archive-progress', {
+      event.sender.send(progressEvent, {
         current: completed,
         total: totalConversations,
         percent: percentComplete
@@ -413,9 +426,9 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
       
       try {
         // Log request details
-        console.log(`Archiving conversation ${conversationId}...`);
+        console.log(`${opName}ing conversation ${conversationId}...`);
         console.log(`Request URL: https://chatgpt.com/backend-api/conversation/${conversationId}`);
-        console.log('Request payload: { is_archived: true }');
+        console.log(`Request payload:`, payload);
         
         // Add a timestamp to track how long the request takes
         const startTime = Date.now();
@@ -430,7 +443,7 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
         
         let response;
         
-        // Make the PATCH request to archive the conversation
+        // Make the PATCH request to process the conversation
         try {
           // Log all the headers we're using exactly as they were from the original cURL
           console.log('Using exactly the same headers from original cURL request');
@@ -461,7 +474,7 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
           // Use the enhanced headers
           response = await axios.patch(
             `https://chatgpt.com/backend-api/conversation/${conversationId}`,
-            { is_archived: true },
+            payload,
             { 
               headers: headersCopy,
               timeout: 15000 // 15 second timeout to prevent hanging requests
@@ -490,17 +503,17 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
         
         // Check for successful response - API returns {success: true}
         if (response.status === 200 && response.data && response.data.success === true) {
-          console.log(`Successfully archived conversation ${conversationId}`);
+          console.log(`Successfully ${operationType}d conversation ${conversationId}`);
           results.success.push(conversationId);
         } else {
-          console.error(`Unexpected response archiving conversation ${conversationId}:`, response.data);
+          console.error(`Unexpected response ${operationType}ing conversation ${conversationId}:`, response.data);
           results.failed.push({
             id: conversationId,
             error: `Unexpected response: ${JSON.stringify(response.data)}`
           });
         }
       } catch (itemError) {
-        console.error(`Error archiving conversation ${conversationId}:`, itemError);
+        console.error(`Error ${operationType}ing conversation ${conversationId}:`, itemError);
         
         // Detailed error logging
         if (itemError.response) {
@@ -533,7 +546,7 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
     }
     
     // Final progress report
-    console.log(`Archive operation completed. Success: ${results.success.length}, Failed: ${results.failed.length}`);
+    console.log(`${opName} operation completed. Success: ${results.success.length}, Failed: ${results.failed.length}`);
     try {
       updateProgress(totalConversations);
     } catch (finalProgressError) {
@@ -543,12 +556,12 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
     return {
       success: true,
       results: results,
-      message: `Successfully archived ${results.success.length} of ${conversationIds.length} conversations`
+      message: `Successfully ${operationType}d ${results.success.length} of ${conversationIds.length} conversations`
     };
   } catch (error) {
-    console.error('Error in archive-conversations:', error);
+    console.error(`Error in ${operationType}-conversations:`, error);
     
-    let errorMessage = 'Failed to archive conversations.';
+    let errorMessage = `Failed to ${operationType} conversations.`;
     if (error.response) {
       errorMessage += ` Status: ${error.response.status}`;
     } else if (error.request) {
@@ -562,6 +575,16 @@ ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
       error: errorMessage
     };
   }
+}
+
+// Handle archiving conversations
+ipcMain.handle('archive-conversations', async (event, { conversationIds }) => {
+  return processConversations(event, { conversationIds, operationType: 'archive' });
+});
+
+// Handle deletion of conversations
+ipcMain.handle('delete-conversations', async (event, { conversationIds }) => {
+  return processConversations(event, { conversationIds, operationType: 'delete' });
 });
 
 // Handle get OpenAI API key request

@@ -100,6 +100,8 @@ function createConversationItem(conversation, state) {
     item.classList.add('marked-for-archive');
   }
   
+  // We'll later set the icon styles based on these markers when we create the buttons
+  
   // Format the date
   const formattedDate = formatDateAsDaysAgo(conversation.update_time);
   
@@ -112,10 +114,53 @@ function createConversationItem(conversation, state) {
   titleContainer.style.display = 'flex';
   titleContainer.style.alignItems = 'center';
   
-  // Create title element
+  // Create title element as a clickable link
   const title = document.createElement('div');
   title.classList.add('conversation-title');
   title.textContent = conversation.title || 'Untitled conversation';
+  title.title = 'Click to open conversation in browser';
+  
+  // Add click handler to open in browser
+  title.addEventListener('click', (event) => {
+    event.stopPropagation();
+    
+    // Create the ChatGPT URL for this conversation
+    const chatGptUrl = `https://chatgpt.com/c/${conversation.id}`;
+    
+    // Show notification
+    if (window.createNotification) {
+      window.createNotification(
+        `Opening conversation in your browser...`,
+        'Opening Conversation',
+        'info',
+        3000
+      );
+    }
+    
+    // Use Electron's shell.openExternal
+    const { shell } = require('electron');
+    shell.openExternal(chatGptUrl)
+      .then(() => {
+        console.log(`Successfully opened conversation in browser: ${chatGptUrl}`);
+      })
+      .catch(error => {
+        console.error(`Error opening URL in browser: ${error.message}`);
+        
+        // Show error notification if it failed
+        if (window.createNotification) {
+          window.createNotification(
+            `Failed to open browser: ${error.message}`,
+            'Error',
+            'error',
+            5000
+          );
+        }
+      });
+    
+    // Log the action
+    console.log(`Opening conversation in browser: ${chatGptUrl}`);
+  });
+  
   titleContainer.appendChild(title);
   
   info.appendChild(titleContainer);
@@ -139,6 +184,7 @@ function createConversationItem(conversation, state) {
   actionButtons.style.gap = '6px';
   actionButtons.style.alignItems = 'center';
   
+  /* CURL COMMAND FUNCTIONALITY - COMMENTED OUT BUT PRESERVED FOR FUTURE USE
   // Add debug button to show cURL command
   const debugButton = document.createElement('button');
   debugButton.textContent = '📋';
@@ -214,7 +260,12 @@ function createConversationItem(conversation, state) {
           return `-H '${key}: ${escapedValue}'`;
         }).join(' ');
         
-        const curlCommand = `curl 'https://chatgpt.com/backend-api/conversation/${conversationId}' -X PATCH ${headerStrings} --data-raw '{"is_archived":true}'`;
+        // Determine if this is a delete or archive action based on the parent button element
+        const isDelete = debugButton.closest('.conversation-buttons')?.querySelector('.delete-icon') !== null;
+        const payload = isDelete ? '{"is_visible":false}' : '{"is_archived":true}';
+        const actionName = isDelete ? 'Deleting' : 'Archiving';
+        
+        const curlCommand = `curl 'https://chatgpt.com/backend-api/conversation/${conversationId}' -X PATCH ${headerStrings} --data-raw '${payload}'`;
         
         try {
           // Copy to clipboard
@@ -222,25 +273,25 @@ function createConversationItem(conversation, state) {
             .then(() => {
               window.showNotification('cURL Command Copied to Clipboard', 
                 `<p>✓ Command copied to clipboard!</p>
-                 <p>Paste and run this command in your terminal to archive the conversation.</p>`,
+                 <p>Paste and run this command in your terminal to ${isDelete ? 'delete' : 'archive'} the conversation.</p>`,
                 3000);
             })
             .catch(err => {
               console.error('Could not copy text to clipboard:', err);
               // Fallback to showing the command in the notification
-              window.showNotification('cURL Command for Archiving', 
+              window.showNotification(`cURL Command for ${isDelete ? 'Deleting' : 'Archiving'}`, 
                 `<p>Could not copy to clipboard. Manual copy required:</p>
                  <input type="text" value="${curlCommand}" readonly style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; margin: 8px 0;" onclick="this.select();" />
-                 <p>Copy and run this command in your terminal to archive the conversation.</p>`, 
+                 <p>Copy and run this command in your terminal to ${isDelete ? 'delete' : 'archive'} the conversation.</p>`, 
                 10000);
             });
         } catch (clipboardError) {
           console.error('Clipboard API error:', clipboardError);
           // Fallback for browsers that don't support clipboard API
-          window.showNotification('cURL Command for Archiving', 
+          window.showNotification(`cURL Command for ${isDelete ? 'Deleting' : 'Archiving'}`, 
             `<p>This command includes all your original headers from your ChatGPT connection:</p>
              <input type="text" value="${curlCommand}" readonly style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; margin: 8px 0;" onclick="this.select();" />
-             <p>Copy and run this command in your terminal to archive the conversation.</p>`, 
+             <p>Copy and run this command in your terminal to ${isDelete ? 'delete' : 'archive'} the conversation.</p>`, 
             10000);
         }
       } catch (error) {
@@ -250,7 +301,9 @@ function createConversationItem(conversation, state) {
     }
   });
   
-  actionButtons.appendChild(debugButton);
+  // Commented out to remove from UI
+  // actionButtons.appendChild(debugButton);
+  */
 
   // Add category label to buttons container if available
   if (conversation.category) {
@@ -327,6 +380,7 @@ function createConversationItem(conversation, state) {
   
   // Add archive button
   const archiveButton = document.createElement('button');
+  archiveButton.classList.add('archive-icon'); // Add class for querying
   archiveButton.textContent = '📦';
   archiveButton.title = 'Archive this conversation';
   archiveButton.style.background = 'none';
@@ -337,6 +391,15 @@ function createConversationItem(conversation, state) {
   archiveButton.style.padding = '4px 8px';
   archiveButton.style.borderRadius = '4px';
   archiveButton.style.transition = 'background-color 0.2s';
+  
+  // Set initial opacity and color based on selection state
+  if (state.selectedForArchive && state.selectedForArchive.includes(conversation.id)) {
+    // Highlighted if selected
+    archiveButton.style.opacity = '1';
+  } else {
+    // Dimmed if not selected
+    archiveButton.style.opacity = '0.7';
+  }
   
   // Add hover effect
   archiveButton.addEventListener('mouseover', () => {
@@ -357,16 +420,33 @@ function createConversationItem(conversation, state) {
     if (state.selectedForDeletion && state.selectedForDeletion.includes(conversationId)) {
       state.selectedForDeletion = state.selectedForDeletion.filter(id => id !== conversationId);
       item.classList.remove('marked-for-deletion');
+      
+      // Reset delete icons in this item
+      const deleteIcons = item.querySelectorAll('.delete-icon');
+      deleteIcons.forEach(icon => {
+        if (icon) {
+          icon.style.opacity = '0.7';
+          icon.style.color = '#e53e3e';
+        }
+      });
     }
     
     // Toggle archive marking
     if (state.selectedForArchive && state.selectedForArchive.includes(conversationId)) {
       state.selectedForArchive = state.selectedForArchive.filter(id => id !== conversationId);
       item.classList.remove('marked-for-archive');
+      
+      // Reset this archive icon
+      archiveButton.style.opacity = '0.7';
+      archiveButton.style.color = '#3182ce';
     } else {
       if (!state.selectedForArchive) state.selectedForArchive = [];
       state.selectedForArchive.push(conversationId);
       item.classList.add('marked-for-archive');
+      
+      // Highlight this archive icon
+      archiveButton.style.opacity = '1';
+      archiveButton.style.color = '#3182ce';
     }
     
     // Update button visibility
@@ -378,6 +458,7 @@ function createConversationItem(conversation, state) {
   
   // Add delete button
   const deleteButton = document.createElement('button');
+  deleteButton.classList.add('delete-icon'); // Add class for querying
   deleteButton.textContent = '🗑️';
   deleteButton.title = 'Delete this conversation';
   deleteButton.style.background = 'none';
@@ -388,6 +469,15 @@ function createConversationItem(conversation, state) {
   deleteButton.style.padding = '4px 8px';
   deleteButton.style.borderRadius = '4px';
   deleteButton.style.transition = 'background-color 0.2s';
+  
+  // Set initial opacity and color based on selection state
+  if (state.selectedForDeletion && state.selectedForDeletion.includes(conversation.id)) {
+    // Highlighted if selected
+    deleteButton.style.opacity = '1';
+  } else {
+    // Dimmed if not selected
+    deleteButton.style.opacity = '0.7';
+  }
   
   // Add hover effect
   deleteButton.addEventListener('mouseover', () => {
@@ -408,16 +498,33 @@ function createConversationItem(conversation, state) {
     if (state.selectedForArchive && state.selectedForArchive.includes(conversationId)) {
       state.selectedForArchive = state.selectedForArchive.filter(id => id !== conversationId);
       item.classList.remove('marked-for-archive');
+      
+      // Reset archive icons in this item
+      const archiveIcons = item.querySelectorAll('.archive-icon');
+      archiveIcons.forEach(icon => {
+        if (icon) {
+          icon.style.opacity = '0.7';
+          icon.style.color = '#3182ce';
+        }
+      });
     }
     
     // Toggle deletion marking
     if (state.selectedForDeletion && state.selectedForDeletion.includes(conversationId)) {
       state.selectedForDeletion = state.selectedForDeletion.filter(id => id !== conversationId);
       item.classList.remove('marked-for-deletion');
+      
+      // Reset this delete icon
+      deleteButton.style.opacity = '0.7';
+      deleteButton.style.color = '#e53e3e';
     } else {
       if (!state.selectedForDeletion) state.selectedForDeletion = [];
       state.selectedForDeletion.push(conversationId);
       item.classList.add('marked-for-deletion');
+      
+      // Highlight this delete icon
+      deleteButton.style.opacity = '1';
+      deleteButton.style.color = '#e53e3e';
     }
     
     // Update button visibility
@@ -450,6 +557,11 @@ function renderConversations(conversations, state) {
 
   // If we have a category filter active, show it
   if (state.currentCategoryFilter) {
+    // Calculate the count of conversations in this category - total across all pages
+    const filteredCount = state.cachedConversations.filter(conv => 
+      conv.category && conv.category.includes(state.currentCategoryFilter)
+    ).length;
+    
     const filterNotice = document.createElement('div');
     filterNotice.classList.add('filter-notice');
     filterNotice.innerHTML = `
@@ -457,14 +569,14 @@ function renderConversations(conversations, state) {
                   padding: 10px; background-color: #f0f9ff; margin-bottom: 15px; 
                   border-radius: 4px; border-left: 4px solid #3b82f6;">
         <div style="display: flex; align-items: center; gap: 15px;">
-          <span>Filtering by: <strong>${state.currentCategoryFilter}</strong></span>
+          <span>Filtering by: <strong>${state.currentCategoryFilter}</strong> <span class="filter-count" style="background-color: rgba(59, 130, 246, 0.2); border-radius: 10px; padding: 2px 8px; font-size: 14px; margin-left: 8px;">${filteredCount} ${filteredCount === 1 ? 'conversation' : 'conversations'}</span></span>
           <div style="display: flex; gap: 8px;">
-            <span id="bulkArchiveButton" title="Mark all filtered conversations for archive" 
+            <span id="bulkArchiveButton" title="Mark all conversations in this category for archive" 
                  style="cursor: pointer; font-size: 16px; color: #3182ce; background-color: rgba(49, 130, 206, 0.1); 
                         padding: 3px 6px; border-radius: 4px; display: flex; align-items: center;">
               <span style="margin-right: 3px;">📦</span> Mark All for Archive
             </span>
-            <span id="bulkDeleteButton" title="Mark all filtered conversations for deletion" 
+            <span id="bulkDeleteButton" title="Mark all conversations in this category for deletion" 
                  style="cursor: pointer; font-size: 16px; color: #e53e3e; background-color: rgba(229, 62, 62, 0.1); 
                         padding: 3px 6px; border-radius: 4px; display: flex; align-items: center;">
               <span style="margin-right: 3px;">🗑️</span> Mark All for Deletion
@@ -483,7 +595,16 @@ function renderConversations(conversations, state) {
     const clearFilterButton = document.getElementById('clearFilterButton');
     if (clearFilterButton) {
       clearFilterButton.addEventListener('click', () => {
+        // Clear the filter
         state.currentCategoryFilter = null;
+        
+        // Remove the filter notice immediately
+        const filterNotice = document.querySelector('.filter-notice');
+        if (filterNotice) {
+          filterNotice.remove();
+        }
+        
+        // Load all conversations (no filter)
         window.loadConversations();
       });
     }
@@ -494,21 +615,33 @@ function renderConversations(conversations, state) {
     
     if (bulkArchiveButton) {
       bulkArchiveButton.addEventListener('click', async () => {
-        // No confirmation needed, just mark items
-        // Store the previous selection
-        const previousSelection = [...state.selectedForArchive];
+        // Get ALL IDs of conversations in this category from the entire cache, not just the current page
+        const allCategoryIds = state.cachedConversations
+          .filter(conv => conv.category && conv.category.includes(state.currentCategoryFilter))
+          .map(conv => conv.id);
+          
+        // Check if all conversations in this category are already marked
+        const allMarked = allCategoryIds.every(id => state.selectedForArchive.includes(id));
         
-        // Get IDs of filtered conversations
-        const filteredIds = conversations.map(conv => conv.id);
-        
-        // Remove these IDs from deletion selection (mutual exclusivity)
-        state.selectedForDeletion = state.selectedForDeletion.filter(id => !filteredIds.includes(id));
-        
-        // Mark all filtered conversations for archiving
-        state.selectedForArchive = filteredIds;
-        
-        // Combine with any existing selection that's not in this category
-        state.selectedForArchive = [...new Set([...previousSelection, ...state.selectedForArchive])];
+        if (allMarked) {
+          // If all are marked, unmark them all (toggle off)
+          state.selectedForArchive = state.selectedForArchive.filter(id => !allCategoryIds.includes(id));
+          bulkArchiveButton.textContent = '📦 Mark All for Archive';
+          bulkArchiveButton.title = 'Mark all conversations in this category for archive';
+        } else {
+          // Store the previous selection
+          const previousSelection = [...state.selectedForArchive];
+          
+          // Remove these IDs from deletion selection (mutual exclusivity)
+          state.selectedForDeletion = state.selectedForDeletion.filter(id => !allCategoryIds.includes(id));
+          
+          // Mark all category conversations for archiving
+          state.selectedForArchive = [...new Set([...previousSelection, ...allCategoryIds])];
+          
+          // Update button text to indicate unmark action is available
+          bulkArchiveButton.textContent = '📦 Unmark All from Archive';
+          bulkArchiveButton.title = 'Remove all conversations in this category from archive selection';
+        }
         
         // Apply visual styling to each conversation item without reloading
         // This avoids the flicker of reloading the entire list
@@ -517,19 +650,49 @@ function renderConversations(conversations, state) {
           const items = document.querySelectorAll(`.conversation-item[data-id="${conv.id}"],.conversation-item[data-conversation-id="${conv.id}"]`);
           
           items.forEach(item => {
-            // Remove deletion marker if present
-            item.classList.remove('marked-for-deletion');
-            // Add archive marker
-            item.classList.add('marked-for-archive');
-            
-            // Update any archive icons in this item to show selected state
             const archiveIcons = item.querySelectorAll('.archive-icon');
-            archiveIcons.forEach(icon => {
-              if (icon) {
-                icon.style.opacity = '1';
-                icon.style.color = '#3182ce'; // Blue color for archive
-              }
-            });
+            const deleteIcons = item.querySelectorAll('.delete-icon');
+            
+            if (state.selectedForArchive.includes(conv.id)) {
+              // Remove deletion marker if present
+              item.classList.remove('marked-for-deletion');
+              // Add archive marker
+              item.classList.add('marked-for-archive');
+              
+              // Update archive icons to show selected state
+              archiveIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '1';
+                  icon.style.color = '#3182ce'; // Blue color for archive
+                }
+              });
+              
+              // Reset delete icons
+              deleteIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                }
+              });
+            } else if (!state.selectedForDeletion.includes(conv.id)) {
+              // If not marked for archive or deletion, remove both classes
+              item.classList.remove('marked-for-archive');
+              item.classList.remove('marked-for-deletion');
+              
+              // Reset both icon types
+              archiveIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                  icon.style.color = '#3182ce';
+                }
+              });
+              
+              deleteIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                  icon.style.color = '#e53e3e';
+                }
+              });
+            }
           });
         });
         
@@ -546,8 +709,12 @@ function renderConversations(conversations, state) {
         // Make sure the counter badge is visible with proper styling
         const archiveCounter = document.getElementById('archiveCounter');
         if (archiveCounter) {
-          archiveCounter.style.display = 'block';
-          archiveCounter.style.animation = 'fadeIn 0.3s ease-in';
+          if (state.selectedForArchive.length > 0) {
+            archiveCounter.style.display = 'block';
+            archiveCounter.style.animation = 'fadeIn 0.3s ease-in';
+          } else {
+            archiveCounter.style.display = 'none';
+          }
         }
         
         // No need to reload conversations - we've already updated the UI
@@ -556,21 +723,33 @@ function renderConversations(conversations, state) {
     
     if (bulkDeleteButton) {
       bulkDeleteButton.addEventListener('click', async () => {
-        // No confirmation needed, just mark items
-        // Store the previous selection
-        const previousSelection = [...state.selectedForDeletion];
+        // Get ALL IDs of conversations in this category from the entire cache, not just the current page
+        const allCategoryIds = state.cachedConversations
+          .filter(conv => conv.category && conv.category.includes(state.currentCategoryFilter))
+          .map(conv => conv.id);
+          
+        // Check if all conversations in this category are already marked
+        const allMarked = allCategoryIds.every(id => state.selectedForDeletion.includes(id));
         
-        // Get IDs of filtered conversations
-        const filteredIds = conversations.map(conv => conv.id);
-        
-        // Remove these IDs from archive selection (mutual exclusivity)
-        state.selectedForArchive = state.selectedForArchive.filter(id => !filteredIds.includes(id));
-        
-        // Mark all filtered conversations for deletion
-        state.selectedForDeletion = filteredIds;
-        
-        // Combine with any existing selection that's not in this category
-        state.selectedForDeletion = [...new Set([...previousSelection, ...state.selectedForDeletion])];
+        if (allMarked) {
+          // If all are marked, unmark them all (toggle off)
+          state.selectedForDeletion = state.selectedForDeletion.filter(id => !allCategoryIds.includes(id));
+          bulkDeleteButton.textContent = '🗑️ Mark All for Deletion';
+          bulkDeleteButton.title = 'Mark all conversations in this category for deletion';
+        } else {
+          // Store the previous selection
+          const previousSelection = [...state.selectedForDeletion];
+          
+          // Remove these IDs from archive selection (mutual exclusivity)
+          state.selectedForArchive = state.selectedForArchive.filter(id => !allCategoryIds.includes(id));
+          
+          // Mark all category conversations for deletion
+          state.selectedForDeletion = [...new Set([...previousSelection, ...allCategoryIds])];
+          
+          // Update button text to indicate unmark action is available
+          bulkDeleteButton.textContent = '🗑️ Unmark All from Deletion';
+          bulkDeleteButton.title = 'Remove all conversations in this category from deletion selection';
+        }
         
         // Apply visual styling to each conversation item without reloading
         // This avoids the flicker of reloading the entire list
@@ -579,19 +758,49 @@ function renderConversations(conversations, state) {
           const items = document.querySelectorAll(`.conversation-item[data-id="${conv.id}"],.conversation-item[data-conversation-id="${conv.id}"]`);
           
           items.forEach(item => {
-            // Remove archive marker if present
-            item.classList.remove('marked-for-archive');
-            // Add deletion marker
-            item.classList.add('marked-for-deletion');
-            
-            // Update any delete icons in this item to show selected state
+            const archiveIcons = item.querySelectorAll('.archive-icon');
             const deleteIcons = item.querySelectorAll('.delete-icon');
-            deleteIcons.forEach(icon => {
-              if (icon) {
-                icon.style.opacity = '1';
-                icon.style.color = '#e53e3e'; // Red color for deletion
-              }
-            });
+            
+            if (state.selectedForDeletion.includes(conv.id)) {
+              // Remove archive marker if present
+              item.classList.remove('marked-for-archive');
+              // Add deletion marker
+              item.classList.add('marked-for-deletion');
+              
+              // Update delete icons to show selected state
+              deleteIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '1';
+                  icon.style.color = '#e53e3e'; // Red color for deletion
+                }
+              });
+              
+              // Reset archive icons
+              archiveIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                }
+              });
+            } else if (!state.selectedForArchive.includes(conv.id)) {
+              // If not marked for deletion or archive, remove both classes
+              item.classList.remove('marked-for-deletion');
+              item.classList.remove('marked-for-archive');
+              
+              // Reset both icon types
+              archiveIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                  icon.style.color = '#3182ce';
+                }
+              });
+              
+              deleteIcons.forEach(icon => {
+                if (icon) {
+                  icon.style.opacity = '0.7';
+                  icon.style.color = '#e53e3e';
+                }
+              });
+            }
           });
         });
         
@@ -608,8 +817,12 @@ function renderConversations(conversations, state) {
         // Make sure the counter badge is visible with proper styling
         const deleteCounter = document.getElementById('deleteCounter');
         if (deleteCounter) {
-          deleteCounter.style.display = 'block';
-          deleteCounter.style.animation = 'fadeIn 0.3s ease-in';
+          if (state.selectedForDeletion.length > 0) {
+            deleteCounter.style.display = 'block';
+            deleteCounter.style.animation = 'fadeIn 0.3s ease-in';
+          } else {
+            deleteCounter.style.display = 'none';
+          }
         }
         
         // No need to reload conversations - we've already updated the UI
@@ -654,7 +867,36 @@ function renderConversations(conversations, state) {
  */
 function initRendering(state) {
   // Register global functions
-  window.renderConversations = (conversations) => renderConversations(conversations, state);
+  window.renderConversations = (conversations) => {
+    // If we're in a filtered view, ensure we only show conversations that match the filter
+    if (state.currentCategoryFilter && Array.isArray(conversations)) {
+      const filteredConversations = conversations.filter(conv => 
+        conv.category === state.currentCategoryFilter || 
+        (conv.category && conv.category.includes(state.currentCategoryFilter))
+      );
+      
+      // Update the filter notice count if needed
+      const filterCountElement = document.querySelector('.filter-count');
+      if (filterCountElement) {
+        const count = filteredConversations.length;
+        filterCountElement.textContent = `${count} ${count === 1 ? 'conversation' : 'conversations'}`;
+      }
+      
+      return renderConversations(filteredConversations, state);
+    }
+    
+    // If not in a filtered view but there's a filter notice, remove it
+    if (!state.currentCategoryFilter) {
+      const filterNotice = document.querySelector('.filter-notice');
+      if (filterNotice) {
+        filterNotice.remove();
+      }
+    }
+    
+    // Otherwise render all conversations
+    return renderConversations(conversations, state);
+  };
+  
   window.updateButtonsVisibility = () => updateButtonsVisibility(state);
 }
 
