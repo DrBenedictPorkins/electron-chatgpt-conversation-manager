@@ -470,6 +470,7 @@ function initCategorization(state) {
         // Create and add category label
         const categoryElement = document.createElement('div');
         categoryElement.classList.add('conversation-category');
+        categoryElement.style.cursor = 'pointer'; // Indicate it's clickable
         
         // Convert category name to a CSS class name
         // First extract the main part before the &, if present (e.g., "Technology & Software" -> "Technology")
@@ -689,8 +690,32 @@ function initCategorization(state) {
                 dropdownMenu.style.display = 'none';
                 dropdownMenuVisible = false;
                 
-                // If in grouped view, remove from current category group and refresh the view
-                if (state.groupByCategory) {
+                // Check if we're in a filtered view
+                if (state.currentCategoryFilter) {
+                  // If we changed to a different category than the current filter
+                  if (otherCategory !== state.currentCategoryFilter) {
+                    // Animate fade out for this item only
+                    item.style.animation = 'fadeOut 0.5s ease-out forwards';
+                    setTimeout(() => {
+                      // Remove just this item from the view
+                      item.remove();
+                      
+                      // Update the count in the filter notice if present
+                      const filterCountElement = document.querySelector('.filter-count');
+                      if (filterCountElement) {
+                        const currentText = filterCountElement.textContent;
+                        const match = currentText.match(/(\d+)/);
+                        if (match && match[1]) {
+                          const newCount = parseInt(match[1]) - 1;
+                          const pluralSuffix = newCount === 1 ? 'conversation' : 'conversations';
+                          filterCountElement.textContent = `${newCount} ${pluralSuffix}`;
+                        }
+                      }
+                    }, 500);
+                  }
+                } 
+                // If in grouped view but not filtered, refresh the entire view
+                else if (state.groupByCategory) {
                   // Animate fade out
                   item.style.animation = 'fadeOut 0.5s ease-out forwards';
                   setTimeout(() => {
@@ -741,6 +766,20 @@ function initCategorization(state) {
           // Check if the click was on the dropdown icon
           if (e.target === dropdownIcon) {
             toggleDropdown(e);
+          } else {
+            // Filter by this category when clicking anywhere else on the category element
+            e.stopPropagation();
+            
+            // Set the filter and reset to first page
+            state.currentCategoryFilter = category;
+            state.currentOffset = 0;
+            
+            // Update view controls visibility
+            const { updateViewControlButtons } = require('../utils/api-client');
+            updateViewControlButtons(state);
+            
+            // Load conversations with the filter
+            window.loadConversations(0, state.pageSize);
           }
         });
         

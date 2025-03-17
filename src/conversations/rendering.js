@@ -102,8 +102,12 @@ function createConversationItem(conversation, state) {
   
   // We'll later set the icon styles based on these markers when we create the buttons
   
+  // Determine which date to use based on the global sort type
+  const dateField = state.sortType === 'create_time' ? 'create_time' : 'update_time';
+  const dateLabel = state.sortType === 'create_time' ? 'Created:' : 'Updated:';
+  
   // Format the date
-  const formattedDate = formatDateAsDaysAgo(conversation.update_time);
+  const formattedDate = formatDateAsDaysAgo(conversation[dateField]);
   
   // Create conversation info
   const info = document.createElement('div');
@@ -165,10 +169,10 @@ function createConversationItem(conversation, state) {
   
   info.appendChild(titleContainer);
   
-  // Add date
+  // Add date with label
   const date = document.createElement('div');
   date.classList.add('conversation-date');
-  date.textContent = formattedDate;
+  date.innerHTML = `<span style="color: #6c757d;">${dateLabel}</span> ${formattedDate}`;
   info.appendChild(date);
   
   // Create buttons container
@@ -356,23 +360,282 @@ function createConversationItem(conversation, state) {
     category.textContent = conversation.category;
     category.style.marginRight = '10px';
     category.style.cursor = 'pointer';
+    category.style.position = 'relative'; // For dropdown positioning
     
-    // Add click handler to filter by this category
-    category.addEventListener('click', (event) => {
-      event.stopPropagation();
-      
-      // Set the filter and reset to first page
-      state.currentCategoryFilter = conversation.category;
-      state.currentOffset = 0;
-      
-      // Update view controls visibility
-      if (typeof window.updateViewControlButtons === 'function') {
-        window.updateViewControlButtons(state);
-      }
-      
-      // Reload conversations with the filter
-      window.loadConversations(0, state.pageSize);
+    // Add dropdown icon that appears on hover
+    const dropdownIcon = document.createElement('span');
+    dropdownIcon.classList.add('category-dropdown-icon');
+    dropdownIcon.innerHTML = '▼';
+    dropdownIcon.style.marginLeft = '6px';
+    dropdownIcon.style.opacity = '0';
+    dropdownIcon.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    dropdownIcon.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'; // Semi-transparent background
+    dropdownIcon.style.borderRadius = '3px';
+    dropdownIcon.style.padding = '0 3px';
+    dropdownIcon.style.fontSize = '10px';
+    dropdownIcon.style.fontWeight = 'bold';
+    category.appendChild(dropdownIcon);
+    
+    // Show dropdown icon on hover with enhanced effect
+    let dropdownMenuVisible = false;
+    category.addEventListener('mouseenter', () => {
+      dropdownIcon.style.opacity = '1';
+      dropdownIcon.style.transform = 'scale(1.2)'; // Slightly enlarge
+      dropdownIcon.style.backgroundColor = 'rgba(255, 255, 255, 0.5)'; // More visible background
     });
+    
+    category.addEventListener('mouseleave', () => {
+      if (!dropdownMenuVisible) {
+        dropdownIcon.style.opacity = '0';
+        dropdownIcon.style.transform = 'scale(1)';
+        dropdownIcon.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+      }
+    });
+    
+    // Create dropdown menu (initially hidden)
+    const dropdownMenu = document.createElement('div');
+    dropdownMenu.classList.add('category-dropdown-menu');
+    dropdownMenu.style.position = 'absolute';
+    dropdownMenu.style.zIndex = '1000';
+    dropdownMenu.style.backgroundColor = 'white';
+    dropdownMenu.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)'; // Stronger shadow
+    dropdownMenu.style.border = '1px solid #d1d5db'; // Add border
+    dropdownMenu.style.borderRadius = '4px';
+    dropdownMenu.style.padding = '8px 0'; // More padding
+    dropdownMenu.style.minWidth = '220px'; // Wider
+    dropdownMenu.style.maxHeight = '400px'; // Limit height
+    dropdownMenu.style.overflowY = 'auto'; // Add scrolling if needed
+    dropdownMenu.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    dropdownMenu.style.display = 'none';
+    dropdownMenu.style.right = '0';
+    dropdownMenu.style.top = '30px';
+    
+    // Function to toggle dropdown visibility
+    const toggleDropdown = (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+      
+      if (dropdownMenuVisible) {
+        dropdownMenu.style.display = 'none';
+        dropdownMenuVisible = false;
+      } else {
+        // Populate dropdown with all available categories
+        dropdownMenu.innerHTML = '';
+        
+        // Get all unique categories from categorized results
+        if (!window.allCategorizedResults) {
+          const noCategoriesItem = document.createElement('div');
+          noCategoriesItem.style.padding = '6px 12px';
+          noCategoriesItem.style.color = '#6c757d';
+          noCategoriesItem.textContent = 'No categories available';
+          dropdownMenu.appendChild(noCategoriesItem);
+        } else {
+          // Get all unique categories
+          const allCategories = [...new Set(
+            window.allCategorizedResults
+              .map(item => item.category)
+          )];
+          
+          // Filter out current category
+          const otherCategories = allCategories.filter(cat => cat !== conversation.category);
+          
+          // Create items for each other category
+          otherCategories.forEach(otherCategory => {
+            const categoryItem = document.createElement('div');
+            categoryItem.classList.add('category-dropdown-item');
+            categoryItem.textContent = otherCategory;
+            categoryItem.style.padding = '10px 15px'; // More padding
+            categoryItem.style.cursor = 'pointer';
+            categoryItem.style.transition = 'all 0.2s';
+            categoryItem.style.fontSize = '14px'; // Larger font size
+            categoryItem.style.color = '#111827'; // Darker text
+            categoryItem.style.borderBottom = '1px solid #f0f0f0'; // Separator line
+            categoryItem.style.margin = '0 5px'; // Margin on sides
+            
+            // Hover effect
+            categoryItem.addEventListener('mouseenter', () => {
+              categoryItem.style.backgroundColor = '#f0f9ff';
+              categoryItem.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+              categoryItem.style.transform = 'translateX(3px)'; // Slight movement on hover
+            });
+            
+            categoryItem.addEventListener('mouseleave', () => {
+              categoryItem.style.backgroundColor = 'transparent';
+              categoryItem.style.boxShadow = 'none';
+              categoryItem.style.transform = 'translateX(0)';
+            });
+            
+            // Click handler for category change
+            categoryItem.addEventListener('click', (e) => {
+              e.stopPropagation();
+              
+              // Find the categorized item to update
+              if (window.allCategorizedResults) {
+                const categorizedItem = window.allCategorizedResults.find(
+                  item => item.title === conversation.title
+                );
+                if (categorizedItem) {
+                  categorizedItem.category = otherCategory;
+                }
+              }
+              
+              // Update the conversation's category
+              conversation.category = otherCategory;
+              
+              // Update UI
+              category.textContent = otherCategory;
+              category.appendChild(dropdownIcon);
+              
+              // Update CSS class for color
+              category.className = 'conversation-category';
+              
+              // Map the new category (similar mapping logic as before)
+              const newSimplifiedCategory = otherCategory.split('&')[0].trim().toLowerCase();
+              let newMappedCategory = 'other';
+              
+              if (newSimplifiedCategory.includes('technology') || newSimplifiedCategory.includes('software')) {
+                newMappedCategory = 'technology';
+              } else if (newSimplifiedCategory.includes('finance')) {
+                newMappedCategory = 'finance';
+              } else if (newSimplifiedCategory.includes('gaming')) {
+                newMappedCategory = 'gaming';
+              } else if (newSimplifiedCategory.includes('food')) {
+                newMappedCategory = 'food';
+              } else if (newSimplifiedCategory.includes('lifestyle')) {
+                newMappedCategory = 'lifestyle';
+              } else if (newSimplifiedCategory.includes('home')) {
+                newMappedCategory = 'home';
+              } else if (newSimplifiedCategory.includes('automotive')) {
+                newMappedCategory = 'automotive';
+              } else if (newSimplifiedCategory.includes('legal')) {
+                newMappedCategory = 'legal';
+              } else if (newSimplifiedCategory.includes('meeting')) {
+                newMappedCategory = 'meeting';
+              } else if (newSimplifiedCategory.includes('education')) {
+                newMappedCategory = 'education';
+              } else if (newSimplifiedCategory.includes('health')) {
+                newMappedCategory = 'health';
+              } else if (newSimplifiedCategory.includes('travel')) {
+                newMappedCategory = 'travel';
+              } else if (newSimplifiedCategory.includes('business')) {
+                newMappedCategory = 'business';
+              } else if (newSimplifiedCategory.includes('arts') || newSimplifiedCategory.includes('culture')) {
+                newMappedCategory = 'arts';
+              } else if (newSimplifiedCategory.includes('sports')) {
+                newMappedCategory = 'sports';
+              } else if (newSimplifiedCategory.includes('news')) {
+                newMappedCategory = 'news';
+              }
+              
+              category.classList.add(`category-${newMappedCategory}`);
+              
+              // Hide dropdown
+              dropdownMenu.style.display = 'none';
+              dropdownMenuVisible = false;
+              
+              // Check if we're in a filtered view
+              if (state.currentCategoryFilter) {
+                // If we changed to a different category than the current filter
+                if (otherCategory !== state.currentCategoryFilter) {
+                  // Animate fade out for this item only
+                  const conversationItem = item.closest('.conversation-item');
+                  if (conversationItem) {
+                    conversationItem.style.animation = 'fadeOut 0.5s ease-out forwards';
+                    setTimeout(() => {
+                      // Remove just this item from the view
+                      conversationItem.remove();
+                      
+                      // Update the count in the filter notice if present
+                      const filterCountElement = document.querySelector('.filter-count');
+                      if (filterCountElement) {
+                        const currentText = filterCountElement.textContent;
+                        const match = currentText.match(/(\d+)/);
+                        if (match && match[1]) {
+                          const newCount = parseInt(match[1]) - 1;
+                          const pluralSuffix = newCount === 1 ? 'conversation' : 'conversations';
+                          filterCountElement.textContent = `${newCount} ${pluralSuffix}`;
+                        }
+                      }
+                    }, 500);
+                  }
+                }
+              } 
+              // If in grouped view but not filtered, refresh the entire view
+              else if (state.groupByCategory) {
+                window.displayCategorizedConversations(window.allCategorizedResults, 0, state.pageSize);
+              }
+            });
+            
+            dropdownMenu.appendChild(categoryItem);
+          });
+          
+          if (otherCategories.length === 0) {
+            const noCategories = document.createElement('div');
+            noCategories.style.padding = '6px 12px';
+            noCategories.style.color = '#6c757d';
+            noCategories.textContent = 'No other categories available';
+            dropdownMenu.appendChild(noCategories);
+          }
+        }
+        
+        // Show dropdown with animation
+        dropdownMenu.style.display = 'block';
+        dropdownMenu.style.opacity = '0';
+        dropdownMenu.style.transform = 'translateY(-10px)';
+        
+        // Add highlight to make it more noticeable
+        dropdownMenu.style.border = '2px solid #3b82f6';
+        
+        // Animate in
+        setTimeout(() => {
+          dropdownMenu.style.opacity = '1';
+          dropdownMenu.style.transform = 'translateY(0)';
+          
+          // Restore normal border after a short delay
+          setTimeout(() => {
+            dropdownMenu.style.border = '1px solid #d1d5db';
+          }, 800);
+        }, 10);
+        
+        dropdownMenuVisible = true;
+      }
+    };
+    
+    // Add click event for filtering (clicking on the category text)
+    category.addEventListener('click', (event) => {
+      // Check if click is not on the dropdown icon
+      if (event.target !== dropdownIcon) {
+        event.stopPropagation();
+        
+        // Set the filter and reset to first page
+        state.currentCategoryFilter = conversation.category;
+        state.currentOffset = 0;
+        
+        // Update view controls visibility
+        if (typeof window.updateViewControlButtons === 'function') {
+          window.updateViewControlButtons(state);
+        }
+        
+        // Reload conversations with the filter
+        window.loadConversations(0, state.pageSize);
+      }
+    });
+    
+    // Add click event listeners for dropdown functionality
+    dropdownIcon.addEventListener('click', toggleDropdown);
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (event) => {
+      if (dropdownMenuVisible && 
+          !dropdownMenu.contains(event.target) && 
+          !category.contains(event.target)) {
+        dropdownMenu.style.display = 'none';
+        dropdownMenuVisible = false;
+        dropdownIcon.style.opacity = '0';
+      }
+    });
+    
+    // Attach dropdown menu to category
+    category.appendChild(dropdownMenu);
     
     // Add category as the first element in the button container
     buttonsContainer.appendChild(category);
@@ -565,12 +828,20 @@ function renderConversations(conversations, state) {
     const filterNotice = document.createElement('div');
     filterNotice.classList.add('filter-notice');
     filterNotice.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; 
-                  padding: 10px; background-color: #f0f9ff; margin-bottom: 15px; 
-                  border-radius: 4px; border-left: 4px solid #3b82f6;">
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <span>Filtering by: <strong>${state.currentCategoryFilter}</strong> <span class="filter-count" style="background-color: rgba(59, 130, 246, 0.2); border-radius: 10px; padding: 2px 8px; font-size: 14px; margin-left: 8px;">${filteredCount} ${filteredCount === 1 ? 'conversation' : 'conversations'}</span></span>
-          <div style="display: flex; gap: 8px;">
+      <div style="background-color: #f0f9ff; margin-bottom: 15px; 
+                  border-radius: 4px; border-left: 4px solid #3b82f6; padding: 10px;">
+        <!-- Main row with 3 sections -->
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <!-- Left section: Filter info -->
+          <div style="width: 30%;">
+            <div>Filtering by: <strong>${state.currentCategoryFilter}</strong></div>
+            <div class="filter-count" style="background-color: rgba(59, 130, 246, 0.2); border-radius: 10px; padding: 2px 8px; font-size: 14px; margin-top: 4px; display: inline-block;">
+              ${filteredCount} ${filteredCount === 1 ? 'conversation' : 'conversations'}
+            </div>
+          </div>
+          
+          <!-- Center section: Mark All buttons -->
+          <div style="display: flex; gap: 8px; justify-content: center; flex: 1;">
             <span id="bulkArchiveButton" title="Mark all conversations in this category for archive" 
                  style="cursor: pointer; font-size: 16px; color: #3182ce; background-color: rgba(49, 130, 206, 0.1); 
                         padding: 3px 6px; border-radius: 4px; display: flex; align-items: center;">
@@ -582,11 +853,15 @@ function renderConversations(conversations, state) {
               <span style="margin-right: 3px;">🗑️</span> Mark All for Deletion
             </span>
           </div>
+          
+          <!-- Right section: Clear filter button -->
+          <div style="width: 30%; display: flex; justify-content: flex-end;">
+            <button id="clearFilterButton" class="action-button" 
+                   style="font-size: 14px; padding: 5px 10px; background-color: #6c757d;">
+              Clear Filter
+            </button>
+          </div>
         </div>
-        <button id="clearFilterButton" class="action-button" 
-               style="font-size: 14px; padding: 5px 10px; background-color: #6c757d;">
-          Clear Filter
-        </button>
       </div>
     `;
     conversationsList.appendChild(filterNotice);

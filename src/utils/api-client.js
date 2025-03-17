@@ -298,9 +298,19 @@ function updateViewControlButtons(state) {
 }
 
 /**
- * Update the category dropdown with available categories
- * @param {Object} state - Global application state
+ * Apply consistent styling to dropdown menu items
+ * @param {HTMLElement} item - The dropdown item element
  */
+function applyDropdownItemStyle(item) {
+  item.style.padding = '10px 15px'; // More padding
+  item.style.cursor = 'pointer';
+  item.style.transition = 'all 0.2s';
+  item.style.fontSize = '14px'; // Larger font size
+  item.style.color = '#111827'; // Darker text
+  item.style.borderBottom = '1px solid #f0f0f0'; // Separator line
+  item.style.margin = '0 5px'; // Margin on sides
+}
+
 function updateCategoryDropdown(state) {
   const dropdownList = document.getElementById('categoryDropdownList');
   const dropdownMenu = document.getElementById('categoryDropdownMenu');
@@ -322,30 +332,26 @@ function updateCategoryDropdown(state) {
   
   if (categories.size === 0) {
     const noCategories = document.createElement('div');
-    noCategories.style.padding = '10px 15px';
+    // Apply base styling
+    applyDropdownItemStyle(noCategories);
+    // Add special styling for empty state
     noCategories.style.color = '#6c757d';
     noCategories.style.fontStyle = 'italic';
-    noCategories.style.fontSize = '14px';
     noCategories.style.textAlign = 'center';
-    noCategories.style.borderBottom = '1px solid #f0f0f0';
-    noCategories.style.margin = '0 5px';
+    noCategories.style.cursor = 'default';
     noCategories.textContent = 'No categories available';
     dropdownList.appendChild(noCategories);
     return;
   }
   
-  // Add each category to the dropdown
+  // Add each category to the dropdown with enhanced styling
   Array.from(categories).sort().forEach(category => {
     const item = document.createElement('div');
     item.classList.add('category-dropdown-item');
     item.textContent = category;
-    item.style.padding = '10px 15px'; // More padding
-    item.style.cursor = 'pointer';
-    item.style.transition = 'all 0.2s';
-    item.style.fontSize = '14px'; // Larger font size
-    item.style.color = '#111827'; // Darker text
-    item.style.borderBottom = '1px solid #f0f0f0'; // Separator line
-    item.style.margin = '0 5px'; // Margin on sides
+    
+    // Apply consistent item styling
+    applyDropdownItemStyle(item);
     
     // Add hover effect
     item.addEventListener('mouseenter', () => {
@@ -425,6 +431,24 @@ function updateCategoryDropdown(state) {
     if (!groupByCategoryButton.querySelector('.dropdown-toggle')) {
       groupByCategoryButton.appendChild(dropdownToggle);
     }
+    
+    // Style the dropdown menu to match the individual category dropdowns
+    if (dropdownMenu) {
+      dropdownMenu.style.position = 'absolute';
+      dropdownMenu.style.zIndex = '1000';
+      dropdownMenu.style.backgroundColor = 'white';
+      dropdownMenu.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+      dropdownMenu.style.border = '1px solid #d1d5db';
+      dropdownMenu.style.borderRadius = '4px';
+      dropdownMenu.style.padding = '8px 0';
+      dropdownMenu.style.minWidth = '220px';
+      dropdownMenu.style.maxHeight = '400px';
+      dropdownMenu.style.overflowY = 'auto';
+      dropdownMenu.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      dropdownMenu.style.right = '0';
+      dropdownMenu.style.top = '38px';
+    }
+    
     // Add dropdown toggle functionality
     dropdownToggle.addEventListener('click', (e) => {
       // Prevent the main button action
