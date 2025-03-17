@@ -79,8 +79,9 @@ async function loadAllConversations(state) {
     conversationsLoading.classList.add('hidden');
     progressContainer.classList.add('hidden');
     
-    // Sort conversations by update time (newest first)
-    allConversations.sort((a, b) => new Date(b.update_time) - new Date(a.update_time));
+    // Sort conversations based on the current sort type (defaults to update_time if not set)
+    const sortType = state.sortType || 'update_time';
+    allConversations.sort((a, b) => new Date(b[sortType]) - new Date(a[sortType]));
     
     // Store in cache (even if empty)
     state.cachedConversations = allConversations;
@@ -128,6 +129,15 @@ async function fetchConversations(state, offset = 0, limit = state.pageSize) {
     // If we have cached conversations, use them
     if (state.cachedConversations.length > 0) {
       console.log("Using cached conversations for display");
+      
+      // If showing all conversations (no category filter), ensure filter notice is removed
+      if (!state.currentCategoryFilter) {
+        const filterNotice = document.querySelector('.filter-notice');
+        if (filterNotice) {
+          console.log('Removing filter notice when showing all conversations');
+          filterNotice.remove();
+        }
+      }
       
       // Apply category filter if active
       let filteredConversations = state.cachedConversations;
@@ -206,9 +216,26 @@ function updateViewControlButtons(state) {
   const viewControlsContainer = document.getElementById('viewControls');
   const headerViewControls = document.getElementById('headerViewControls');
   
-  // If filtering by a specific category, hide the grouping buttons
+  // Get sort button
+  const sortToggleButton = document.getElementById('sortToggleButton');
+  
+  // If filtering by a specific category, hide only the grouping buttons but keep sort button
   if (state.currentCategoryFilter) {
-    viewControlsContainer.style.display = 'none';
+    // Show the viewControls container but hide specific group buttons
+    if (viewControlsContainer) {
+      viewControlsContainer.style.display = 'block';
+    }
+    
+    // Hide category controls container
+    const categoryControls = document.getElementById('categoryControls');
+    if (categoryControls) categoryControls.style.display = 'none';
+    
+    // Make sure sort button is visible (but only if categorization has been done)
+    if (sortToggleButton && window.hasCategorizedData) {
+      sortToggleButton.classList.remove('hidden');
+      sortToggleButton.style.display = 'flex';
+    }
+    
     return;
   }
   
@@ -238,9 +265,13 @@ function updateViewControlButtons(state) {
     return;
   }
   
-  // Otherwise show the container
+  // Otherwise show the container and category controls
   console.log('Showing view controls - categorization enabled and data available');
   viewControlsContainer.style.display = 'block';
+  
+  // Show category controls
+  const categoryControls = document.getElementById('categoryControls');
+  if (categoryControls) categoryControls.style.display = 'flex';
   
   // Check if we're in delete/archive mode (disable grouping when selecting items)
   const hasSelectedItems = (state.selectedForDeletion && state.selectedForDeletion.length > 0) || 
@@ -291,9 +322,13 @@ function updateCategoryDropdown(state) {
   
   if (categories.size === 0) {
     const noCategories = document.createElement('div');
-    noCategories.style.padding = '8px 12px';
+    noCategories.style.padding = '10px 15px';
     noCategories.style.color = '#6c757d';
     noCategories.style.fontStyle = 'italic';
+    noCategories.style.fontSize = '14px';
+    noCategories.style.textAlign = 'center';
+    noCategories.style.borderBottom = '1px solid #f0f0f0';
+    noCategories.style.margin = '0 5px';
     noCategories.textContent = 'No categories available';
     dropdownList.appendChild(noCategories);
     return;
@@ -302,23 +337,27 @@ function updateCategoryDropdown(state) {
   // Add each category to the dropdown
   Array.from(categories).sort().forEach(category => {
     const item = document.createElement('div');
-    item.style.padding = '8px 12px';
-    item.style.cursor = 'pointer';
-    item.style.transition = 'all 0.2s ease';
-    item.style.borderRadius = '4px';
-    item.style.margin = '2px 4px';
-    item.style.fontSize = '14px';
+    item.classList.add('category-dropdown-item');
     item.textContent = category;
+    item.style.padding = '10px 15px'; // More padding
+    item.style.cursor = 'pointer';
+    item.style.transition = 'all 0.2s';
+    item.style.fontSize = '14px'; // Larger font size
+    item.style.color = '#111827'; // Darker text
+    item.style.borderBottom = '1px solid #f0f0f0'; // Separator line
+    item.style.margin = '0 5px'; // Margin on sides
     
     // Add hover effect
     item.addEventListener('mouseenter', () => {
       item.style.backgroundColor = '#f0f9ff';
       item.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+      item.style.transform = 'translateX(3px)'; // Slight movement on hover
     });
     
     item.addEventListener('mouseleave', () => {
       item.style.backgroundColor = 'transparent';
       item.style.boxShadow = 'none';
+      item.style.transform = 'translateX(0)';
     });
     
     // Add click handler to filter by this category
@@ -345,16 +384,41 @@ function updateCategoryDropdown(state) {
   });
   
   // Add dropdown menu functionality
-  // Create a separate button for the dropdown
+  // Find the group button reference first
+  const groupByCategoryButton = document.getElementById('groupByCategoryButton');
+  
+  // Create a separate button for the dropdown with improved styling
   const dropdownToggle = document.createElement('span');
   dropdownToggle.innerHTML = '▼';
   dropdownToggle.style.marginLeft = '8px';
   dropdownToggle.style.cursor = 'pointer';
+  dropdownToggle.style.transition = 'transform 0.2s, opacity 0.2s';
+  dropdownToggle.style.opacity = '0.8';
+  dropdownToggle.style.fontSize = '10px';
+  dropdownToggle.style.padding = '0 3px';
+  dropdownToggle.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+  dropdownToggle.style.borderRadius = '3px';
   dropdownToggle.title = 'Show category options';
   dropdownToggle.className = 'dropdown-toggle';
   
-  // Find the group button and add the dropdown toggle if needed
-  const groupByCategoryButton = document.getElementById('groupByCategoryButton');
+  // Add hover effect to dropdown toggle if button is found
+  if (groupByCategoryButton) {
+    groupByCategoryButton.addEventListener('mouseenter', () => {
+      const toggle = groupByCategoryButton.querySelector('.dropdown-toggle');
+      if (toggle) {
+        toggle.style.opacity = '1';
+        toggle.style.transform = 'scale(1.2)';
+      }
+    });
+    
+    groupByCategoryButton.addEventListener('mouseleave', () => {
+      const toggle = groupByCategoryButton.querySelector('.dropdown-toggle');
+      if (toggle) {
+        toggle.style.opacity = '0.8';
+        toggle.style.transform = 'scale(1)';
+      }
+    });
+  }
   
   if (groupByCategoryButton && dropdownMenu) {
     // Add the dropdown toggle to the button if not already there
@@ -369,19 +433,32 @@ function updateCategoryDropdown(state) {
       
       // Toggle the dropdown
       if (dropdownMenu.style.display === 'block') {
-        dropdownMenu.style.display = 'none';
+        // Hide dropdown with fade-out effect
+        dropdownMenu.style.opacity = '0';
+        dropdownMenu.style.transform = 'translateY(-10px)';
+        setTimeout(() => {
+          dropdownMenu.style.display = 'none';
+        }, 200);
       } else {
-        // Position the dropdown correctly
+        // Show dropdown with animation
         dropdownMenu.style.display = 'block';
+        dropdownMenu.style.opacity = '0';
+        dropdownMenu.style.transform = 'translateY(-10px)';
         dropdownMenu.style.zIndex = '9999';
         
-        // Add a brief highlight effect to make it more visible
-        dropdownMenu.style.boxShadow = '0 0 15px rgba(74, 108, 247, 0.5)';
+        // Add highlight to make it more noticeable
+        dropdownMenu.style.border = '2px solid #3b82f6';
+        
+        // Animate in
         setTimeout(() => {
-          if (dropdownMenu.style.display === 'block') {
-            dropdownMenu.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-          }
-        }, 300);
+          dropdownMenu.style.opacity = '1';
+          dropdownMenu.style.transform = 'translateY(0)';
+          
+          // Restore normal border after a short delay
+          setTimeout(() => {
+            dropdownMenu.style.border = '1px solid #d1d5db';
+          }, 800);
+        }, 10);
       }
       
       return false;

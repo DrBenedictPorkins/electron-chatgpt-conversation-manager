@@ -1,0 +1,205 @@
+/* Conversations Styles */
+
+/* Conversation List */
+.conversation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.conversation-item {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.conversation-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Style for items marked for deletion */
+.marked-for-deletion {
+  background-color: rgba(254, 202, 202, 0.2);
+  border-left: 3px solid #e53e3e;
+  animation: markForDeletion 0.8s ease forwards;
+  position: relative;
+}
+
+/* Remove the duplicate delete icon */
+.marked-for-deletion::after {
+  content: none;
+}
+
+/* Style for items marked for archive */
+.marked-for-archive {
+  background-color: rgba(191, 219, 254, 0.2);
+  border-left: 3px solid #3182ce;
+  animation: markForArchive 0.8s ease forwards;
+  position: relative;
+}
+
+/* Animation for marking items for archive */
+@keyframes markForArchive {
+  0% { background-color: rgba(191, 219, 254, 0); border-left-width: 0; transform: translateX(0); }
+  25% { background-color: rgba(191, 219, 254, 0.7); border-left-width: 8px; transform: translateX(5px); }
+  50% { background-color: rgba(191, 219, 254, 0.5); border-left-width: 6px; transform: translateX(-3px); }
+  75% { background-color: rgba(191, 219, 254, 0.3); border-left-width: 4px; transform: translateX(2px); }
+  100% { background-color: rgba(191, 219, 254, 0.2); border-left-width: 3px; transform: translateX(0); }
+}
+
+/* Animation for marking items for deletion */
+@keyframes markForDeletion {
+  0% { background-color: rgba(254, 202, 202, 0); border-left-width: 0; transform: translateX(0); }
+  25% { background-color: rgba(254, 202, 202, 0.7); border-left-width: 8px; transform: translateX(5px); }
+  50% { background-color: rgba(254, 202, 202, 0.5); border-left-width: 6px; transform: translateX(-3px); }
+  75% { background-color: rgba(254, 202, 202, 0.3); border-left-width: 4px; transform: translateX(2px); }
+  100% { background-color: rgba(254, 202, 202, 0.2); border-left-width: 3px; transform: translateX(0); }
+}
+
+.conversation-info {
+  flex: 1;
+  min-width: 0; /* Allow flex item to shrink below content size */
+  margin-right: 20px; /* Space between info and buttons */
+  max-width: 70%; /* Limit maximum width of info section */
+}
+
+.conversation-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%; /* Full width within container */
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.conversation-title:hover {
+  color: #3182ce; /* Blue color on hover */
+  text-decoration: underline;
+}
+
+.conversation-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0; /* Prevent buttons from shrinking */
+  margin-left: auto; /* Push to the right edge */
+}
+
+.conversation-date {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.conversation-category {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  margin-right: 5px; /* Space between category and buttons */
+}
+
+/* Category colors */
+.category-technology { background-color: #3b82f6; }
+.category-finance { background-color: #10b981; }
+.category-gaming { background-color: #8b5cf6; }
+.category-food { background-color: #f59e0b; }
+.category-lifestyle { background-color: #ec4899; }
+.category-home { background-color: #6366f1; }
+.category-automotive { background-color: #ef4444; }
+.category-legal { background-color: #64748b; }
+.category-meeting { background-color: #0ea5e9; }
+.category-education { background-color: #14b8a6; }
+.category-health { background-color: #22c55e; }
+.category-travel { background-color: #a855f7; }
+.category-business { background-color: #0284c7; }
+.category-arts { background-color: #f43f5e; }
+.category-sports { background-color: #84cc16; }
+.category-news { background-color: #ea580c; }
+.category-other { background-color: #6b7280; }
+
+/* Category Header */
+.category-header {
+  font-size: 18px;
+  font-weight: bold;
+  padding: 15px;
+  background-color: #f0f9ff;
+  border-bottom: 1px solid #b6d4fe;
+  color: #0a58ca;
+  margin-top: 10px;
+}
+
+/* Conversations container styles */
+.conversations-container {
+  max-height: calc(100vh - 350px);
+  overflow-y: auto;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  background-color: white;
+  padding: 1px;
+  margin-bottom: 20px;
+}
+
+/* Filter styles */
+.filter-notice {
+  margin-bottom: 15px;
+}
+
+.category-filter-button {
+  font-size: 12px;
+  padding: 4px 8px;
+  background-color: #e2e8f0;
+  color: #1e40af;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.category-filter-button:hover {
+  background-color: #cbd5e1;
+}
+
+/* Pagination */
+.pagination {
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 42px; /* Match the height of the buttons */
+}
+
+.pagination-left, .pagination-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.pagination-center {
+  flex: 2;
+  text-align: center;
+  font-size: 14px;
+  color: #6c757d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+.pagination-right {
+  text-align: right;
+  justify-content: flex-end;
+}

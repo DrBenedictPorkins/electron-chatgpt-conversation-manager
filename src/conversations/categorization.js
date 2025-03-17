@@ -7,9 +7,48 @@ const { formatDateAsDaysAgo } = require('../utils/date-formatter');
  * @param {Object} state - Global application state
  */
 function initCategorization(state) {
+  // Initialize deletion tracking if not exists
+  if (!state.selectedForDeletion) {
+    state.selectedForDeletion = [];
+  }
+  
+  // Set up event handler for categorize button
+  const categorizeButton = document.getElementById('categorizeButton');
+  if (categorizeButton) {
+    categorizeButton.addEventListener('click', function() {
+      // First show the API key modal
+      if (window.showApiKeyModal) {
+        window.showApiKeyModal();
+      } else {
+        console.error('API key modal function not available');
+        alert('Error: API key modal not available. Please restart the application.');
+      }
+    });
+  }
+  
+  // Create a function to update button visibility based on categorization state
+  window.updateCategorizeButtonsVisibility = function() {
+    const categorizeContainer = document.getElementById('categorizeContainer');
+    
+    if (window.hasCategorizedData === true) {
+      // Hide main categorize button
+      if (categorizeContainer) categorizeContainer.style.display = 'none';
+    } else {
+      // Show main categorize button
+      if (categorizeContainer) categorizeContainer.style.display = 'block';
+    }
+  };
+  
+  // Run once at initialization to set initial state
+  window.updateCategorizeButtonsVisibility();
+
   // Function to start the categorization process
   window.startCategorizingConversations = async function() {
     try {
+      
+      // Set a flag that we're in the categorization process
+      window.isCategorizing = true;
+      
       // Show loading indicator
       const conversationsLoading = document.getElementById('conversationsLoading');
       const progressContainer = document.getElementById('progressContainer');
@@ -61,7 +100,9 @@ function initCategorization(state) {
           window.updateProgressBar(50 + (i / batches.length) * 45);
         }
         
+        console.log(`Making API call to ChatGPT for categorization (batch ${i+1}/${batches.length}) with ${batches[i].length} titles`);
         const result = await ipcRenderer.invoke('categorize-conversations', { titles: batches[i] });
+        console.log(`Received ChatGPT API response for batch ${i+1}/${batches.length}:`, result.success ? 'Success!' : `Error: ${result.error}`);
         
         if (result.success) {
           categorizedResults.push(...result.categories);
@@ -104,19 +145,125 @@ function initCategorization(state) {
         // Store the categorization results for future use
         window.allCategorizedResults = result.categories;
         
-        // Hide the categorize button and its container
-        const categorizeButton = document.getElementById('categorizeButton');
-        const categorizeContainer = document.querySelector('.categorize-container');
-        if (categorizeContainer) {
-          categorizeContainer.style.display = 'none';
+        // Track if any conversations were successfully categorized
+        let categorizedCount = 0;
+        result.categories.forEach(item => {
+          // Find and update the corresponding conversation
+          const conversation = state.cachedConversations.find(conv => 
+            (conv.title || 'Untitled conversation') === item.title
+          );
+          if (conversation) {
+            conversation.category = item.category;
+            categorizedCount++;
+          }
+        });
+        
+        // After categorization, show only the header recategorize button
+        const recategorizeHeaderButton = document.getElementById('recategorizeHeaderButton');
+        
+        // Show only the header re-categorize button
+        if (recategorizeHeaderButton) {
+          recategorizeHeaderButton.style.display = 'inline-flex';
         }
         
-        // Display the categorized results
+        // Show container and display the categorized results
+        const container = document.getElementById('conversationsContainer');
+        if (container) {
+          container.classList.remove('hidden');
+        }
         window.displayCategorizedConversations(result.categories, 0, state.pageSize);
         
-        // Show view controls now that we have categorized data
-        const { updateViewControlButtons } = require('../utils/api-client');
-        updateViewControlButtons(state);
+        // Show a message about the categorization results
+        let successMessage = `Successfully categorized ${categorizedCount} conversations into ${new Set(result.categories.map(item => item.category)).size} categories.`;
+        if (categorizedCount > 0) {
+          successMessage += ' You can now use the "Group by Category" button to organize your conversations.';
+          
+          // Set the global categorization flag to indicate we have categorized data
+          window.hasCategorizedData = true;
+          
+          // Persist categorization status in localStorage
+          try {
+            localStorage.setItem('hasCategorizedData', 'true');
+          } catch (e) {
+            console.error('Error saving categorization status to localStorage:', e);
+          }
+          
+          // Create and show the conversations container dynamically
+          const placeholder = document.getElementById('conversationsContainerPlaceholder');
+          if (placeholder) {
+            // Create the container (hidden by default)
+            const conversationsContainer = document.createElement('div');
+            conversationsContainer.className = 'conversations-container hidden';
+            conversationsContainer.id = 'conversationsContainer';
+            
+            // Create the conversation list
+            const conversationsList = document.createElement('ul');
+            conversationsList.className = 'conversation-list';
+            conversationsList.id = 'conversationsList';
+            conversationsContainer.appendChild(conversationsList);
+            
+            // Create pagination container
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination';
+            paginationDiv.innerHTML = `
+              <div class="pagination-controls">
+                <div class="pagination-left">
+                  <button id="prevButton" class="back-button">&larr; Previous</button>
+                </div>
+                <div class="pagination-center">
+                  <span id="paginationInfo" style="display: inline-block; padding: 6px 12px; background-color: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">Showing 1-20 of 0</span>
+                </div>
+                <div class="pagination-right">
+                  <button id="nextPageButton" class="next-button">Next &rarr;</button>
+                </div>
+              </div>
+            `;
+            conversationsContainer.appendChild(paginationDiv);
+            
+            // Replace the placeholder with the actual container
+            placeholder.parentNode.replaceChild(conversationsContainer, placeholder);
+            
+            // Register pagination event listeners
+            if (window.attachPaginationListeners) {
+              window.attachPaginationListeners();
+            }
+          }
+          
+          // Enable the categorization feature
+          if (window.forceCategoryButtonVisibility) {
+            window.forceCategoryButtonVisibility(true);
+          }
+          
+          // Update button visibility based on categorization state
+          if (window.updateCategorizeButtonsVisibility) {
+            window.updateCategorizeButtonsVisibility();
+          }
+          
+          // No header button anymore
+          
+          // Then show view controls since we have successfully categorized conversations
+          const { updateViewControlButtons, updateCategoryDropdown } = require('../utils/api-client');
+          updateViewControlButtons(state);
+          
+          // Make sure dropdown has the latest categories
+          updateCategoryDropdown(state);
+          
+          // Show the sort toggle button
+          const sortToggleButton = document.getElementById('sortToggleButton');
+          if (sortToggleButton) {
+            sortToggleButton.classList.remove('hidden');
+          }
+          
+          // Update the Total Conversations stat with category count
+          const totalCategories = new Set(result.categories.map(item => item.category)).size;
+          const statsCountElement = document.getElementById('statsTotalCount');
+          if (statsCountElement) {
+            const currentCount = statsCountElement.textContent;
+            statsCountElement.innerHTML = `${currentCount} <span style="font-size: 0.85em; color: #4a6cf7;">(${totalCategories} Categories)</span>`;
+          }
+        } else {
+          window.showConversationError('No conversations were successfully categorized. Please try again or adjust your categorization prompt.');
+        }
         
         // Load the first page of conversations to display with the updated cachedConversations
         // that now include category information
@@ -131,15 +278,20 @@ function initCategorization(state) {
       conversationsLoading.classList.add('hidden');
       progressContainer.classList.add('hidden');
       window.showConversationError(`Error during categorization: ${error.message}`);
+    } finally {
+      // Reset categorization flag
+      window.isCategorizing = false;
+      
+      // Update button visibility based on categorization state
+      if (window.updateCategorizeButtonsVisibility) {
+        window.updateCategorizeButtonsVisibility();
+      }
     }
   };
   
   // Function to display categorized conversations with pagination
   window.displayCategorizedConversations = function(categorizedItems, offset = 0, limit = state.pageSize) {
     const conversationsList = document.getElementById('conversationsList');
-    
-    // Show the conversation list
-    conversationsList.classList.remove('hidden');
     
     // Pagination will be controlled by updatePagination function based on categorization status
     
@@ -295,6 +447,11 @@ function initCategorization(state) {
         // Add info container to the item
         item.appendChild(infoContainer);
         
+        // Store conversation ID as data attribute for deletion tracking
+        if (originalConversation) {
+          item.dataset.conversationId = originalConversation.id;
+        }
+        
         // Create category container
         const categoryContainer = document.createElement('div');
         categoryContainer.classList.add('category-container');
@@ -390,7 +547,7 @@ function initCategorization(state) {
         const dropdownMenu = document.createElement('div');
         dropdownMenu.classList.add('category-dropdown-menu');
         dropdownMenu.style.position = 'absolute';
-        dropdownMenu.style.zIndex = '100';
+        dropdownMenu.style.zIndex = '1000'; // Increased z-index to ensure it appears on top
         dropdownMenu.style.backgroundColor = 'white';
         dropdownMenu.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
         dropdownMenu.style.borderRadius = '4px';
@@ -442,6 +599,9 @@ function initCategorization(state) {
               categoryItem.style.fontSize = '11px';
               categoryItem.style.overflow = 'hidden';
               categoryItem.style.textOverflow = 'ellipsis';
+              categoryItem.style.position = 'relative';
+              categoryItem.style.zIndex = '10000'; // Extremely high z-index
+              categoryItem.style.backgroundColor = 'white'; // Ensure background is solid
               
               // Hover effect
               categoryItem.addEventListener('mouseenter', () => {
@@ -543,8 +703,27 @@ function initCategorization(state) {
               dropdownMenu.appendChild(noCategories);
             }
             
+            // Force the dropdown to be visible and on top
             dropdownMenu.style.display = 'block';
+            dropdownMenu.style.zIndex = '1000';
             dropdownMenuVisible = true;
+            
+            // Force high z-index to ensure visibility
+            dropdownMenu.style.zIndex = '9999';
+            
+            // Make sure the dropdown is positioned prominently
+            dropdownMenu.style.position = 'absolute';
+            dropdownMenu.style.right = '0';
+            dropdownMenu.style.top = '30px';
+            
+            // Add a bright border temporarily to make it more visible
+            const originalBorder = dropdownMenu.style.border;
+            dropdownMenu.style.border = '2px solid #3b82f6';
+            
+            // Restore original border after a short delay
+            setTimeout(() => {
+                dropdownMenu.style.border = originalBorder;
+            }, 1000);
           }
         };
         
@@ -560,12 +739,20 @@ function initCategorization(state) {
         dropdownIcon.addEventListener('click', toggleDropdown);
         
         // Close dropdown when clicking outside
-        document.addEventListener('click', () => {
-          if (dropdownMenuVisible) {
+        document.addEventListener('click', (event) => {
+          // Only close if click is outside the dropdown and its trigger
+          if (dropdownMenuVisible && 
+              !dropdownMenu.contains(event.target) && 
+              !categoryElement.contains(event.target)) {
             dropdownMenu.style.display = 'none';
             dropdownMenuVisible = false;
             dropdownIcon.style.opacity = '0';
           }
+        });
+        
+        // Prevent event propagation from dropdown menu to avoid closing
+        dropdownMenu.addEventListener('click', (event) => {
+          event.stopPropagation();
         });
         
         // Add elements to container
@@ -584,6 +771,81 @@ function initCategorization(state) {
             console.log('- Display computed:', window.getComputedStyle(categoryElement).display);
             console.log('- Visibility computed:', window.getComputedStyle(categoryElement).visibility);
           }, 100);
+        }
+        
+        // Add delete icon
+        if (originalConversation) {
+          const deleteIcon = document.createElement('span');
+          deleteIcon.classList.add('delete-icon');
+          deleteIcon.innerHTML = '🗑️';
+          deleteIcon.title = 'Mark for deletion';
+          deleteIcon.style.marginLeft = '10px';
+          deleteIcon.style.cursor = 'pointer';
+          deleteIcon.style.opacity = '0.5';
+          deleteIcon.style.transition = 'opacity 0.2s';
+          deleteIcon.style.fontSize = '14px';
+          
+          // Hover effects
+          deleteIcon.addEventListener('mouseenter', () => {
+            deleteIcon.style.opacity = '1';
+          });
+          
+          deleteIcon.addEventListener('mouseleave', () => {
+            if (!state.selectedForDeletion.includes(originalConversation.id)) {
+              deleteIcon.style.opacity = '0.5';
+            }
+          });
+          
+          // Click handler for deletion mark
+          deleteIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the conversation click event
+            
+            // Toggle selection for deletion
+            if (state.selectedForDeletion.includes(originalConversation.id)) {
+              // Remove from selected
+              state.selectedForDeletion = state.selectedForDeletion.filter(id => id !== originalConversation.id);
+              deleteIcon.style.opacity = '0.5';
+              deleteIcon.style.color = 'inherit';
+              
+              // Remove the class to un-mark it
+              item.classList.remove('marked-for-deletion');
+              
+              // Add a subtle transition back to normal
+              item.style.transition = 'background-color 0.3s ease, border-left-width 0.3s ease';
+              item.style.backgroundColor = '';
+              item.style.borderLeft = '';
+              
+              // Reset after transition completes
+              setTimeout(() => {
+                item.style.transition = '';
+              }, 300);
+            } else {
+              // Add to selected
+              state.selectedForDeletion.push(originalConversation.id);
+              deleteIcon.style.opacity = '1';
+              deleteIcon.style.color = 'red';
+              
+              // Reset any inline styles to ensure animation plays
+              item.style.transition = '';
+              item.style.backgroundColor = '';
+              item.style.borderLeft = '';
+              
+              // Apply the class which has the animation
+              item.classList.add('marked-for-deletion');
+            }
+            
+            // Update delete button visibility
+            window.updateDeleteButtonVisibility();
+          });
+          
+          // If this conversation is already marked for deletion, update the icon appearance
+          if (state.selectedForDeletion.includes(originalConversation.id)) {
+            deleteIcon.style.opacity = '1';
+            deleteIcon.style.color = 'red';
+            item.classList.add('marked-for-deletion');
+          }
+          
+          item.appendChild(deleteIcon);
         }
         
         // Add the item to the list
