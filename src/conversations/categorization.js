@@ -223,10 +223,19 @@ function initCategorization(state) {
             // Replace the placeholder with the actual container
             placeholder.parentNode.replaceChild(conversationsContainer, placeholder);
             
+            // Make sure the conversationsContainer is visible
+            conversationsContainer.classList.remove('hidden');
+            
             // Register pagination event listeners
-            if (window.attachPaginationListeners) {
-              window.attachPaginationListeners();
-            }
+            console.log('Attaching pagination event listeners after categorization');
+            setTimeout(() => {
+              if (window.attachPaginationListeners) {
+                window.attachPaginationListeners();
+                console.log('Pagination event listeners attached after categorization');
+              } else {
+                console.error('attachPaginationListeners function not available');
+              }
+            }, 100); // Small delay to ensure DOM is updated
           }
           
           // Enable the categorization feature
