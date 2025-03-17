@@ -134,6 +134,16 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Clear Grouping function called');
       if (state) state.groupByCategory = false;
       
+      // Ensure the filter notice is removed when clearing grouping
+      const filterNotice = document.querySelector('.filter-notice');
+      if (filterNotice) {
+        console.log('Removing filter notice when clearing grouping');
+        filterNotice.remove();
+      }
+      
+      // Reset any active category filter
+      if (state) state.currentCategoryFilter = null;
+      
       // Update buttons visibility
       const { updateViewControlButtons } = require('./utils/api-client');
       updateViewControlButtons(state);
@@ -185,8 +195,17 @@ document.addEventListener('DOMContentLoaded', () => {
     window.forceCategoryButtonVisibility(false);
     
     // Create a global flag to track categorization status
-    // Always start with categorization being required (first-time user experience)
-    window.hasCategorizedData = false;
+    // Check localStorage for previous categorization status
+    try {
+      window.hasCategorizedData = localStorage.getItem('hasCategorizedData') === 'true';
+      
+      // Note: We no longer show the conversations container here.
+      // It will be shown/hidden in the showScreen function based on categorization status.
+    } catch (e) {
+      // If there's an error accessing localStorage, default to requiring categorization
+      console.error('Error reading categorization status from localStorage:', e);
+      window.hasCategorizedData = false;
+    }
   }
   
   // Add window resize listener for responsive container

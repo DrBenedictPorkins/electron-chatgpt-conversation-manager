@@ -40,20 +40,12 @@ function createNotification(message, title, type = 'success', duration = 8000) {
   }
   
   // Style the notification to make it float in the middle of the screen
-  notification.style.position = 'fixed';
-  notification.style.left = '50%';
-  notification.style.top = '30%';
-  notification.style.transform = 'translate(-50%, -50%) scale(0.95)';
+  notification.classList.add('persistent-notification');
   notification.style.backgroundColor = bgColor;
   notification.style.color = textColor;
-  notification.style.padding = '15px 20px';
-  notification.style.borderRadius = '8px';
-  notification.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.25)';
-  notification.style.zIndex = '10000';
-  notification.style.width = '85%';
-  notification.style.maxWidth = '600px';
-  notification.style.transition = 'all 0.3s ease-in-out';
   notification.style.opacity = '0';
+  notification.style.transform = 'translate(-50%, -50%) scale(0.95)';
+  notification.style.transition = 'all 0.3s ease-in-out';
   
   // Create title with icon
   const titleElement = document.createElement('div');
@@ -93,7 +85,8 @@ function createNotification(message, title, type = 'success', duration = 8000) {
   // Add to document body
   document.body.appendChild(notification);
   
-  // Animate entry
+  // Add animation class and animate entry
+  notification.classList.add('notification-animate');
   setTimeout(() => {
     notification.style.opacity = '1';
     notification.style.transform = 'translate(-50%, -50%) scale(1)';

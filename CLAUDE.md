@@ -27,3 +27,8 @@
 ## Error Handling
 - Use try/catch blocks for async operations
 - Log errors with appropriate context
+
+## Repository Guidelines
+- Do not perform git operations (commit, push, tag, etc.) without explicit request
+- Do not suggest or ask to do git-related commands
+- Don't create git commits or tag versions automatically

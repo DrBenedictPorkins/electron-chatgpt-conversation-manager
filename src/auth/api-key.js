@@ -2,6 +2,14 @@
 const { ipcRenderer } = require('electron');
 
 /**
+ * Restore UI state after canceling categorization
+ */
+function restoreUIAfterCancel() {
+  console.log('Canceling categorization');
+  // Just close the modal without changing anything
+}
+
+/**
  * Initialize API key management functionality
  * @param {Object} state - Global application state
  */
@@ -84,12 +92,16 @@ function initApiKey(state) {
   apiKeyModal.addEventListener('click', (event) => {
     if (event.target === apiKeyModal) {
       window.hideApiKeyModal();
+      // Restore UI elements
+      restoreUIAfterCancel();
     }
   });
   
   promptModal.addEventListener('click', (event) => {
     if (event.target === promptModal) {
       window.hidePromptModal();
+      // Restore UI elements
+      restoreUIAfterCancel();
     }
   });
   
@@ -103,19 +115,27 @@ function initApiKey(state) {
   // Handle close modal button clicks
   closeModalButton.addEventListener('click', () => {
     window.hideApiKeyModal();
+    // Restore UI elements
+    restoreUIAfterCancel();
   });
   
   closePromptButton.addEventListener('click', () => {
     window.hidePromptModal();
+    // Restore UI elements
+    restoreUIAfterCancel();
   });
   
   // Handle cancel button clicks
   cancelApiKeyButton.addEventListener('click', () => {
     window.hideApiKeyModal();
+    // Restore UI elements
+    restoreUIAfterCancel();
   });
   
   cancelPromptButton.addEventListener('click', () => {
     window.hidePromptModal();
+    // Restore UI elements
+    restoreUIAfterCancel();
   });
   
   // Handle reset prompt button click
@@ -136,7 +156,9 @@ function initApiKey(state) {
     apiKeyError.classList.add('hidden');
     
     try {
+      console.log('Validating OpenAI API key...');
       const result = await ipcRenderer.invoke('save-openai-key', { apiKey });
+      console.log('OpenAI API key validation result:', result.success ? 'Success!' : `Error: ${result.error}`);
       
       if (result.success) {
         window.hideApiKeyModal();
@@ -169,14 +191,17 @@ function initApiKey(state) {
     }
     
     try {
+      console.log('Saving custom prompt for ChatGPT categorization...');
       const result = await ipcRenderer.invoke('save-custom-prompt', { 
         customPrompt, 
         save: savePrompt 
       });
+      console.log('Custom prompt save result:', result.success ? 'Success!' : `Error: ${result.error}`);
       
       if (result.success) {
         window.hidePromptModal();
         
+        // Now that we've confirmed via API key and prompt dialogs, we can start the categorization process
         // Show loading indicator
         const conversationsLoading = document.getElementById('conversationsLoading');
         const progressContainer = document.getElementById('progressContainer');
@@ -186,7 +211,7 @@ function initApiKey(state) {
         progressContainer.classList.remove('hidden');
         loadingText.textContent = 'Categorizing conversations...';
         
-        // Start categorization process
+        // Start categorization process (will clear previous categorization data if hasCategorizedData is true)
         window.startCategorizingConversations();
         
         // Show conversation list and pagination after categorization
