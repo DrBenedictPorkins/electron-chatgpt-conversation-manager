@@ -50,7 +50,9 @@ function initPagination(state) {
     }
     
     if (nextPageButton) {
-      nextPageButton.style.display = offset + limit >= total ? 'none' : 'inline-block';
+      const shouldHideNext = offset + limit >= total;
+      console.log(`Pagination: Next button visibility check - offset (${offset}) + limit (${limit}) ${offset + limit} >= total (${total}) = ${shouldHideNext ? 'hide' : 'show'}`);
+      nextPageButton.style.display = shouldHideNext ? 'none' : 'inline-block';
     }
     
     // Update current offset
@@ -62,7 +64,30 @@ function initPagination(state) {
       if (!window.paginationState.currentCategoryFilter) {
         window.paginationState.totalConversations = total;
       }
+      
+      // Debug current pagination state after update
+      console.log('Updated pagination state:', {
+        offset: offset,
+        limit: limit,
+        total: total,
+        currentOffset: window.paginationState.currentOffset,
+        pageSize: window.paginationState.pageSize,
+        totalConversations: window.paginationState.totalConversations,
+        nextButtonVisible: document.getElementById('nextPageButton') ? document.getElementById('nextPageButton').style.display : 'element not found'
+      });
     }
+  };
+  
+  // Update pagination info function to global scope
+  window.debugPaginationState = function() {
+    console.log("Current Pagination State:", {
+      currentOffset: window.paginationState ? window.paginationState.currentOffset : "undefined",
+      pageSize: window.paginationState ? window.paginationState.pageSize : "undefined",
+      totalConversations: window.paginationState ? window.paginationState.totalConversations : "undefined",
+      groupByCategory: window.paginationState ? window.paginationState.groupByCategory : "undefined",
+      currentCategoryFilter: window.paginationState ? window.paginationState.currentCategoryFilter : "undefined",
+      allCategorizedResults: window.allCategorizedResults ? window.allCategorizedResults.length : "undefined"
+    });
   };
   
   // We'll add event listeners, but we'll check if elements exist first
@@ -127,8 +152,11 @@ function initPagination(state) {
         totalToUse = filterConversationsByCategory(window.paginationState, window.paginationState.currentCategoryFilter).length;
       } else if (window.paginationState.groupByCategory && window.allCategorizedResults) {
         // When grouped by category, use the total from categorized results
+        console.log("Next button: using categorized results total:", window.allCategorizedResults.length);
         totalToUse = window.allCategorizedResults.length;
       }
+      
+      console.log("Next button clicked: newOffset =", newOffset, "totalToUse =", totalToUse);
       
       if (newOffset < totalToUse) {
         if (window.paginationState.groupByCategory && !window.paginationState.currentCategoryFilter && window.allCategorizedResults) {
@@ -153,6 +181,37 @@ function initPagination(state) {
   // Also make this function available globally for later attachment
   window.attachPaginationListeners = addPaginationEventListeners;
   
+  // Debug function to help check event listener status
+  window.debugPaginationListeners = function() {
+    const nextButton = document.getElementById('nextPageButton');
+    const prevButton = document.getElementById('prevButton');
+    console.log('Pagination buttons found:', {
+      nextButton: !!nextButton,
+      prevButton: !!prevButton
+    });
+    if (nextButton) {
+      console.log('Next button has listeners:', !!nextButton._hasEventListeners);
+      // Force attach listeners
+      if (!nextButton._hasEventListeners) {
+        console.log('Forcibly attaching listeners to pagination buttons');
+        addPaginationEventListeners();
+      }
+      
+      // Add direct click handler for testing
+      nextButton.onclick = function() {
+        console.log('Direct onclick handler fired for Next button');
+        const newOffset = window.paginationState.currentOffset + window.paginationState.pageSize;
+        if (window.paginationState.groupByCategory && !window.paginationState.currentCategoryFilter && window.allCategorizedResults) {
+          console.log('Using displayCategorizedConversations with offset:', newOffset);
+          window.displayCategorizedConversations(window.allCategorizedResults, newOffset, window.paginationState.pageSize);
+        } else {
+          console.log('Using loadConversations with offset:', newOffset);
+          window.loadConversations(newOffset);
+        }
+      };
+    }
+  };
+  
   // As a safety measure, periodically check for pagination buttons and attach listeners if needed
   const ensurePaginationListenersAttached = () => {
     const nextPageButton = document.getElementById('nextPageButton');
@@ -160,6 +219,28 @@ function initPagination(state) {
     if (nextPageButton && !nextPageButton._hasEventListeners) {
       console.log('Found nextPageButton without listeners, attaching them now');
       addPaginationEventListeners();
+      
+      // Add a direct onclick handler as a fallback
+      nextPageButton.onclick = function() {
+        console.log('Fallback onclick handler fired for Next button');
+        const newOffset = window.paginationState.currentOffset + window.paginationState.pageSize;
+        console.log('Current state:', {
+          offset: window.paginationState.currentOffset,
+          newOffset: newOffset,
+          pageSize: window.paginationState.pageSize,
+          groupByCategory: window.paginationState.groupByCategory,
+          filter: window.paginationState.currentCategoryFilter,
+          hasCategorizedResults: !!window.allCategorizedResults
+        });
+        
+        if (window.paginationState.groupByCategory && !window.paginationState.currentCategoryFilter && window.allCategorizedResults) {
+          console.log('Using displayCategorizedConversations with offset:', newOffset);
+          window.displayCategorizedConversations(window.allCategorizedResults, newOffset, window.paginationState.pageSize);
+        } else {
+          console.log('Using loadConversations with offset:', newOffset);
+          window.loadConversations(newOffset);
+        }
+      };
     }
   };
   
@@ -167,6 +248,13 @@ function initPagination(state) {
   for (let i = 1; i <= 10; i++) {
     setTimeout(ensurePaginationListenersAttached, i * 1000);
   }
+  
+  // Also run on document ready
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(ensurePaginationListenersAttached, 500);
+    setTimeout(ensurePaginationListenersAttached, 1000);
+    setTimeout(ensurePaginationListenersAttached, 2000);
+  });
 }
 
 module.exports = {

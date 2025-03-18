@@ -208,13 +208,23 @@ function initCategorization(state) {
             paginationDiv.innerHTML = `
               <div class="pagination-controls">
                 <div class="pagination-left">
-                  <button id="prevButton" class="back-button">&larr; Previous</button>
+                  <button id="prevButton" class="back-button" onclick="(function(){
+                      console.log('Inline Previous button clicked');
+                      const newOffset = Math.max(0, window.paginationState.currentOffset - window.paginationState.pageSize);
+                      console.log('Moving to offset:', newOffset);
+                      window.displayCategorizedConversations(window.allCategorizedResults, newOffset, window.paginationState.pageSize);
+                    })()">&larr; Previous</button>
                 </div>
                 <div class="pagination-center">
                   <span id="paginationInfo" style="display: inline-block; padding: 6px 12px; background-color: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">Showing 1-20 of 0</span>
                 </div>
                 <div class="pagination-right">
-                  <button id="nextPageButton" class="next-button">Next &rarr;</button>
+                  <button id="nextPageButton" class="next-button" onclick="(function(){
+                      console.log('Inline Next button clicked');
+                      const newOffset = window.paginationState.currentOffset + window.paginationState.pageSize;
+                      console.log('Moving to offset:', newOffset);
+                      window.displayCategorizedConversations(window.allCategorizedResults, newOffset, window.paginationState.pageSize);
+                    })()">Next &rarr;</button>
                 </div>
               </div>
             `;
@@ -228,14 +238,43 @@ function initCategorization(state) {
             
             // Register pagination event listeners
             console.log('Attaching pagination event listeners after categorization');
-            setTimeout(() => {
+            
+            // Try multiple times with increasing delays to ensure listeners are attached
+            const tryAttachListeners = (attempt = 1) => {
+              console.log(`Attempt ${attempt} to attach pagination listeners after categorization`);
               if (window.attachPaginationListeners) {
                 window.attachPaginationListeners();
                 console.log('Pagination event listeners attached after categorization');
+                
+                // Additionally add a direct onclick handler as a fallback
+                const nextButton = document.getElementById('nextPageButton');
+                if (nextButton) {
+                  console.log('Adding backup onclick handler to Next button');
+                  nextButton.onclick = function() {
+                    console.log('Direct Next button click handler called');
+                    const newOffset = window.paginationState.currentOffset + window.paginationState.pageSize;
+                    window.displayCategorizedConversations(window.allCategorizedResults, newOffset, window.paginationState.pageSize);
+                  };
+                } else {
+                  console.error('Next button not found when trying to add onclick handler');
+                }
+                
+                // After a short delay, debug the listener status
+                setTimeout(() => {
+                  if (window.debugPaginationListeners) {
+                    window.debugPaginationListeners();
+                  }
+                }, 500);
               } else {
                 console.error('attachPaginationListeners function not available');
+                if (attempt < 5) {
+                  setTimeout(() => tryAttachListeners(attempt + 1), attempt * 200);
+                }
               }
-            }, 100); // Small delay to ensure DOM is updated
+            };
+            
+            // Initial attempt with delay to ensure DOM is updated
+            setTimeout(tryAttachListeners, 100);
           }
           
           // Enable the categorization feature
@@ -300,7 +339,32 @@ function initCategorization(state) {
   
   // Function to display categorized conversations with pagination
   window.displayCategorizedConversations = function(categorizedItems, offset = 0, limit = state.pageSize) {
+    console.log("displayCategorizedConversations called with:", {
+      items: categorizedItems ? categorizedItems.length : 0,
+      offset: offset,
+      limit: limit,
+      state: {
+        pageSize: state.pageSize,
+        currentOffset: window.paginationState ? window.paginationState.currentOffset : 'undefined',
+        groupByCategory: window.paginationState ? window.paginationState.groupByCategory : 'undefined'
+      }
+    });
+    
+    if (!categorizedItems || categorizedItems.length === 0) {
+      console.error("No categorized items to display!");
+      return;
+    }
+    
     const conversationsList = document.getElementById('conversationsList');
+    if (!conversationsList) {
+      console.error("conversationsList element not found!");
+      return;
+    }
+    
+    // Update pagination state
+    if (window.paginationState) {
+      window.paginationState.currentOffset = offset;
+    }
     
     // Pagination will be controlled by updatePagination function based on categorization status
     
@@ -344,6 +408,14 @@ function initCategorization(state) {
     let currentPosition = 0;
     let itemsOnCurrentPage = 0;
     let categoriesOnCurrentPage = [];
+    
+    console.log(`displayCategorizedConversations: offset=${offset}, limit=${limit}, totalItems=${totalItems}, categorized data length=${categorizedItems.length}`);
+    
+    // Debug categories information
+    console.log("Categories data:", Object.keys(categoriesMap).map(category => ({
+      category,
+      count: categoriesMap[category].length
+    })));
     
     // Determine which categories and items will appear on the current page
     for (const category of sortedCategories) {
@@ -902,6 +974,7 @@ function initCategorization(state) {
     });
     
     // Update pagination
+    console.log("displayCategorizedConversations: updating pagination with", offset, limit, totalItems);
     window.updatePagination(offset, limit, totalItems);
     
     // Show success message if this is the first time displaying categories

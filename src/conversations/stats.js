@@ -230,6 +230,55 @@ function initStats(state) {
       state.selectedForDeletion = [];
       state.selectedForArchive = [];
       
+      // Define the resetUIForRecategorization function if it doesn't exist
+      if (!window.resetUIForRecategorization) {
+        // Define a global helper function to reset the UI
+        window.resetUIForRecategorization = function() {
+          // Reset visual markers on all conversation items
+          document.querySelectorAll('.conversation-item').forEach(item => {
+            item.classList.remove('marked-for-deletion', 'marked-for-archive');
+            
+            // Reset styles
+            item.style.transition = 'background-color 0.3s ease, border-left-width 0.3s ease';
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+            
+            // Reset icons to visible and default state
+            const deleteIcon = item.querySelector('.delete-icon');
+            if (deleteIcon) {
+              deleteIcon.style.display = 'inline';
+              deleteIcon.style.opacity = '0.5';
+              deleteIcon.style.color = 'inherit';
+            }
+            
+            const archiveIcon = item.querySelector('.archive-icon');
+            if (archiveIcon) {
+              archiveIcon.style.display = 'inline';
+              archiveIcon.style.opacity = '0.5';
+              archiveIcon.style.color = 'inherit';
+            }
+          });
+          
+          // Clear counters in the UI
+          const deleteCounter = document.getElementById('deleteCounter');
+          const archiveCounter = document.getElementById('archiveCounter');
+          if (deleteCounter) deleteCounter.style.display = 'none';
+          if (archiveCounter) archiveCounter.style.display = 'none';
+          
+          // Reset bulk action buttons if they exist
+          const bulkArchiveButton = document.getElementById('bulkArchiveButton');
+          const bulkDeleteButton = document.getElementById('bulkDeleteButton');
+          if (bulkArchiveButton) {
+            bulkArchiveButton.innerHTML = '<span style="margin-right: 3px;">📦</span> Archive All';
+            bulkArchiveButton.style.backgroundColor = 'rgba(49, 130, 206, 0.1)';
+          }
+          if (bulkDeleteButton) {
+            bulkDeleteButton.innerHTML = '<span style="margin-right: 3px;">🗑️</span> Delete All';
+            bulkDeleteButton.style.backgroundColor = 'rgba(229, 62, 62, 0.1)';
+          }
+        };
+      }
+      
       // Reset the UI to pre-categorization state
       window.resetUIForRecategorization();
       
@@ -277,52 +326,6 @@ function initStats(state) {
       const categoryHeaders = document.querySelectorAll('.category-header');
       categoryHeaders.forEach(header => header.remove());
     }
-    
-    // Define a global helper function to reset the UI
-    window.resetUIForRecategorization = function() {
-      // Reset visual markers on all conversation items
-      document.querySelectorAll('.conversation-item').forEach(item => {
-        item.classList.remove('marked-for-deletion', 'marked-for-archive');
-        
-        // Reset styles
-        item.style.transition = 'background-color 0.3s ease, border-left-width 0.3s ease';
-        item.style.backgroundColor = '';
-        item.style.borderLeft = '';
-        
-        // Reset icons to visible and default state
-        const deleteIcon = item.querySelector('.delete-icon');
-        if (deleteIcon) {
-          deleteIcon.style.display = 'inline';
-          deleteIcon.style.opacity = '0.5';
-          deleteIcon.style.color = 'inherit';
-        }
-        
-        const archiveIcon = item.querySelector('.archive-icon');
-        if (archiveIcon) {
-          archiveIcon.style.display = 'inline';
-          archiveIcon.style.opacity = '0.5';
-          archiveIcon.style.color = 'inherit';
-        }
-      });
-      
-      // Clear counters in the UI
-      const deleteCounter = document.getElementById('deleteCounter');
-      const archiveCounter = document.getElementById('archiveCounter');
-      if (deleteCounter) deleteCounter.style.display = 'none';
-      if (archiveCounter) archiveCounter.style.display = 'none';
-      
-      // Reset bulk action buttons if they exist
-      const bulkArchiveButton = document.getElementById('bulkArchiveButton');
-      const bulkDeleteButton = document.getElementById('bulkDeleteButton');
-      if (bulkArchiveButton) {
-        bulkArchiveButton.innerHTML = '<span style="margin-right: 3px;">📦</span> Archive All';
-        bulkArchiveButton.style.backgroundColor = 'rgba(49, 130, 206, 0.1)';
-      }
-      if (bulkDeleteButton) {
-        bulkDeleteButton.innerHTML = '<span style="margin-right: 3px;">🗑️</span> Delete All';
-        bulkDeleteButton.style.backgroundColor = 'rgba(229, 62, 62, 0.1)';
-      }
-    };
     
     // First, load all conversations if they aren't already cached
     if (state.cachedConversations.length === 0) {
